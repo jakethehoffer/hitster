@@ -41,3 +41,11 @@ Files changed: index.html, js/{jsonp,deezer,itunes,app,decks}.js, css/style.css,
 Tests run: npm test 40/40; smoke green incl. typed token count -> scoreboard dots; live: HUMBLE./In da Club/Espresso resolve explicit=true with previews; prod: tokens number field + deezer module served, In da Club resolves explicit from deployed origin
 Blockers: none
 Next steps: Jake: use Fix preview on any already-cached songs to upgrade them to explicit; genre decks resolve explicit automatically on first play
+
+## 2026-07-29T00:09:31.0527349-04:00 - claude
+
+Summary: House rule: challenge tokens only lost on wrong guesses. resolveTurn judges all challenges against the pre-insertion timeline, refunds correct challengers (incl. tie-year case where active also correct), outcome.refunded lists them, reveal screen names them, challenge label updated. Skips still cost a token. Deployed.
+Files changed: js/engine.js, js/app.js, test/engine.test.mjs, README.md, docs spec
+Tests run: npm test 44/44 (4 new refund tests: steal+refund, wrong loses, tie refund, mixed challengers); smoke green; prod serving refund engine
+Blockers: none
+Next steps: none pending — play it
