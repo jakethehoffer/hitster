@@ -219,6 +219,66 @@ test('resolveTurn discards when nobody is correct', () => {
   assert.equal(s.players[1].timeline.length, 1);
 });
 
+// --- challenge token refunds (house rule: only lose tokens on a wrong guess) ---
+
+test('a correct challenger gets their token back along with the steal', () => {
+  const s = freshGame();
+  s.players[0].timeline = [card(1980), card(2000)];
+  s.players[1].timeline = [card(1990)];
+  startTurn(s);
+  s.mystery = card(1995);
+  placeCard(s, 0); // active wrong
+  addChallenge(s, 1, 2); // correct slot (1980 <= 1995 <= 2000 -> slot 1? timeline [1980,2000], 1995 fits slot 1)
+  s.challenges = [{ player: 1, slot: 1 }]; // point at the correct middle slot
+  assert.equal(s.players[1].tokens, 1); // token spent on the challenge
+  resolveTurn(s);
+  assert.equal(s.outcome.stolenBy, 1);
+  assert.deepEqual(s.outcome.refunded, [1]);
+  assert.equal(s.players[1].tokens, 2); // refunded — net zero for a right guess
+});
+
+test('a wrong challenger loses the token', () => {
+  const s = freshGame();
+  s.players[0].timeline = [card(1980), card(2000)];
+  startTurn(s);
+  s.mystery = card(1995);
+  placeCard(s, 1); // active correct
+  addChallenge(s, 1, 0); // wrong slot
+  resolveTurn(s);
+  assert.equal(s.outcome.activeCorrect, true);
+  assert.deepEqual(s.outcome.refunded, []);
+  assert.equal(s.players[1].tokens, 1); // spent, not returned
+});
+
+test('tie years: active keeps the card but a also-correct challenger is refunded', () => {
+  const s = freshGame();
+  s.players[0].timeline = [card(1980), card(1990), card(2000)];
+  startTurn(s);
+  s.mystery = card(1990); // slots 1 AND 2 both correct
+  placeCard(s, 1);
+  addChallenge(s, 1, 2);
+  resolveTurn(s);
+  assert.equal(s.outcome.activeCorrect, true);
+  assert.equal(s.outcome.stolenBy, null);
+  assert.deepEqual(s.outcome.refunded, [1]);
+  assert.equal(s.players[1].tokens, 2);
+});
+
+test('mixed challengers: only the correct one is refunded, first correct steals', () => {
+  const s = createGame({ players: ['A', 'B', 'C'], deck: makeDeck(25), rngSeed: 5 });
+  s.players[0].timeline = [card(1980), card(2000)];
+  startTurn(s);
+  s.mystery = card(1995);
+  placeCard(s, 0); // wrong
+  addChallenge(s, 1, 2); // wrong (after 2000)
+  addChallenge(s, 2, 1); // correct
+  resolveTurn(s);
+  assert.equal(s.outcome.stolenBy, 2);
+  assert.deepEqual(s.outcome.refunded, [2]);
+  assert.equal(s.players[1].tokens, 1); // lost
+  assert.equal(s.players[2].tokens, 2); // refunded
+});
+
 // --- bonus tokens ---
 
 test('awardBonus adds a token only during reveal', () => {

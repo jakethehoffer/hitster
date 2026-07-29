@@ -548,7 +548,7 @@ function renderPhase() {
         && !game.challenges.some((c) => c.player === i));
     if (game.settings.challengesEnabled && eligible.length > 0) {
       const picker = el('div', { class: 'challenge-picker' },
-        el('span', { class: 'phase-sub', text: 'Challenge (1 token): ' }));
+        el('span', { class: 'phase-sub', text: 'Challenge (1 token — back if you’re right): ' }));
       for (const { pl, i } of eligible) {
         picker.append(el('button', {
           class: `btn${selectedChallenger === i ? ' picked' : ''}`,
@@ -579,6 +579,13 @@ function renderPhase() {
       area.append(el('p', { class: 'outcome steal', text: `⚡ Stolen by ${game.players[o.stolenBy].name}!` }));
     } else {
       area.append(el('p', { class: 'outcome bad', text: '✘ Nobody got it — into the bin.' }));
+    }
+    const refunded = o.refunded || [];
+    if (refunded.length > 0) {
+      area.append(el('p', {
+        class: 'phase-sub',
+        text: `Right guess — token back: ${refunded.map((i) => game.players[i].name).join(', ')}`,
+      }));
     }
     const bonus = el('div', { class: 'bonus-row' },
       el('span', { class: 'label', text: 'Named artist + title? Grab a token:' }));

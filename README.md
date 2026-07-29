@@ -34,7 +34,8 @@ Same as real Hitster:
 3. Tap the slot in your timeline where you think the song belongs
    (before/between/after your cards), then press **Lock it in**.
 4. Anyone else who thinks you're wrong can **challenge** for 1 token: tap
-   their name, then the slot they think is right.
+   their name, then the slot they think is right. A correct challenge gets
+   the token back — you only lose it on a wrong guess.
 5. **Reveal!** Correct placement keeps the card (ties on the same year count
    as correct). If you were wrong and a challenger was right, they steal it.
 6. If anyone named the artist **and** title out loud, tap their name under

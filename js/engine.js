@@ -139,15 +139,28 @@ export function resolveTurn(state) {
   requirePhase(state, 'challenge');
   const active = state.players[state.current];
   const card = state.mystery;
+  // Judge everything against the timeline BEFORE the card is inserted —
+  // insertion shifts slot indices.
   const activeCorrect = isSlotCorrect(active.timeline, card, state.placedSlot);
+  const judged = state.challenges.map((c) => ({
+    ...c,
+    correct: isSlotCorrect(active.timeline, card, c.slot),
+  }));
+  // House rule: a challenge token is only lost on a wrong guess.
+  const refunded = [];
+  for (const c of judged) {
+    if (c.correct) {
+      state.players[c.player].tokens += 1;
+      refunded.push(c.player);
+    }
+  }
   let stolenBy = null;
   let discarded = false;
 
   if (activeCorrect) {
     active.timeline.splice(state.placedSlot, 0, card);
   } else {
-    const winner = state.challenges.find((c) =>
-      isSlotCorrect(active.timeline, card, c.slot));
+    const winner = judged.find((c) => c.correct);
     if (winner) {
       stolenBy = winner.player;
       insertIntoTimeline(state.players[winner.player].timeline, card);
@@ -156,7 +169,7 @@ export function resolveTurn(state) {
       state.discard.push(card);
     }
   }
-  state.outcome = { activeCorrect, stolenBy, discarded };
+  state.outcome = { activeCorrect, stolenBy, discarded, refunded };
   state.phase = 'reveal';
 }
 
