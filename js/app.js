@@ -152,6 +152,10 @@ function downloadDeck(deck) {
 
 let editingDeckId = null;
 
+const sameSong = (a, b) =>
+  a.title.toLowerCase() === b.title.toLowerCase()
+  && a.artist.toLowerCase() === b.artist.toLowerCase();
+
 function openDeckEdit(id) {
   editingDeckId = id;
   const deck = getDeck(storage, id);
@@ -193,7 +197,7 @@ function renderDeckSongs() {
         ? el('button', { class: 'btn btn-small listen-btn', text: '▶', onclick: (e) => toggleListen(song.previewUrl, e.target) })
         : null,
       el('button', {
-        class: 'btn btn-small', text: '↻', title: 'Re-fetch preview (fixes wrong versions)',
+        class: 'btn btn-small', text: '↻ Fix preview', title: 'Re-fetch the preview (fixes wrong versions)',
         onclick: async (e) => {
           e.target.disabled = true;
           try {
@@ -252,37 +256,62 @@ async function runSearch() {
       status.classList.remove('hidden');
       return;
     }
-    const list = $('#search-results');
-    for (const card of results) {
-      list.append(el('li', { class: 'song-item' },
-        card.artworkUrl ? el('img', { src: card.artworkUrl, alt: '' }) : null,
-        el('div', { class: 'song-text' },
-          el('div', { class: 'song-title', text: card.title }),
-          el('div', { class: 'song-artist', text: card.artist })),
-        el('span', { class: 'song-year', text: String(card.year ?? '?') }),
-        el('button', { class: 'btn btn-small listen-btn', text: '▶', onclick: (e) => toggleListen(card.previewUrl, e.target) }),
-        el('button', {
-          class: 'btn btn-primary btn-small', text: '+ Add',
-          onclick: () => {
-            if (!Number.isInteger(card.year)) {
-              toast('This result has no release year — pick another version');
-              return;
-            }
-            const d = getDeck(storage, editingDeckId);
-            if (d.songs.some((s) => s.title === card.title && s.artist === card.artist)) {
-              toast('Already in this deck');
-              return;
-            }
-            d.songs.push({ ...card });
-            saveDeck(storage, d);
-            toast(`Added "${card.title}" (${card.year}) — edit the year if that's a re-release date`);
-            renderDeckSongs();
-          },
-        })));
-    }
+    renderSearchResults(results);
   } catch (err) {
     status.textContent = `Search failed (${err.message}) — check your connection and retry.`;
     status.classList.remove('hidden');
+  }
+}
+
+function renderSearchResults(results) {
+  const list = clear($('#search-results'));
+  const deckSongs = getDeck(storage, editingDeckId).songs;
+  for (const card of results) {
+    // A song already in the deck gets a "use this preview" action instead of
+    // Add — searching is the natural way to fix a wrong-version preview.
+    const inDeck = deckSongs.some((s) => sameSong(s, card));
+    const action = inDeck
+      ? el('button', {
+        class: 'btn btn-small', text: '↻ Use this preview',
+        title: 'Already in this deck — make its preview play this exact version',
+        onclick: () => {
+          const d = getDeck(storage, editingDeckId);
+          const target = d.songs.find((s) => sameSong(s, card));
+          if (!target) return;
+          target.previewUrl = card.previewUrl;
+          target.artworkUrl = card.artworkUrl || target.artworkUrl;
+          saveDeck(storage, d);
+          toast(`"${target.title}" will now play this version`);
+          renderDeckSongs();
+        },
+      })
+      : el('button', {
+        class: 'btn btn-primary btn-small', text: '+ Add',
+        onclick: () => {
+          if (!Number.isInteger(card.year)) {
+            toast('This result has no release year — pick another version');
+            return;
+          }
+          const d = getDeck(storage, editingDeckId);
+          if (d.songs.some((s) => sameSong(s, card))) {
+            toast('Already in this deck');
+            return;
+          }
+          d.songs.push({ ...card });
+          saveDeck(storage, d);
+          toast(`Added "${card.title}" (${card.year}) — edit the year if that's a re-release date`);
+          renderDeckSongs();
+          renderSearchResults(results); // the added song's row flips to "use this preview"
+        },
+      });
+    list.append(el('li', { class: 'song-item' },
+      card.artworkUrl ? el('img', { src: card.artworkUrl, alt: '' }) : null,
+      el('div', { class: 'song-text' },
+        el('div', { class: 'song-title', text: card.title }),
+        el('div', { class: 'song-artist', text: card.artist })),
+      el('span', { class: 'song-year', text: String(card.year ?? '?') }),
+      el('button', { class: 'btn btn-small listen-btn', text: '▶', onclick: (e) => toggleListen(card.previewUrl, e.target) }),
+      action));
   }
 }
 
@@ -847,6 +876,12 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btn-export-deck').addEventListener('click', () => downloadDeck(getDeck(storage, editingDeckId)));
   $('#btn-search').addEventListener('click', runSearch);
   $('#song-search').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+  $('#btn-clear-search').addEventListener('click', () => {
+    clear($('#search-results'));
+    $('#song-search').value = '';
+    $('#search-status').classList.add('hidden');
+    stopAudio();
+  });
 
   $('#btn-add-player').addEventListener('click', () => addPlayerRow());
   $('#setup-deck').addEventListener('change', updateDeckWarning);

@@ -68,9 +68,11 @@ Three built-in decks are included: the **Starter deck** (well-known hits
 1966–2024), **Rap & Hip-Hop** (1979–2024), and **Pop Through the Decades**
 (1963–2024). They're normal decks — edit, prune with 👎 votes, or delete them.
 
-If a preview plays the wrong version of a song (remix, acapella, live), open
-the deck editor and hit the **↻** button on that song — it re-fetches the
-preview with a matcher that prefers the original recording.
+If a preview plays the wrong version of a song (remix, acapella, live), fix it
+either way: search the song in the deck editor and click **↻ Use this preview**
+on the exact version you want, or hit **↻ Fix preview** on the song's row in
+the deck list below (it re-fetches with a matcher that prefers the original
+recording).
 
 ## Development
 
