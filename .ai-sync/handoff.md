@@ -33,3 +33,11 @@ Files changed: index.html, js/app.js, README.md
 Tests run: npm test 35/35; npm run smoke green; live browser test: in-deck Espresso row shows Use-this-preview while alternates show +Add, click persists previewUrl+artwork, Clear empties results; prod build built and serving new app.js
 Blockers: none
 Next steps: Jake: search espresso in the starter deck editor and click 'Use this preview' on the plain Espresso row
+
+## 2026-07-29T00:00:25.6340105-04:00 - claude
+
+Summary: Explicit previews + custom token field: discovered Apple Search API now serves only clean/censored tracks (even WAP), so preview audio resolves Deezer-first (explicit originals preferred via scoreMatch bonus) with iTunes fallback; new js/deezer.js + shared js/jsonp.js; added songs auto-upgrade previews in background; E badges; starting tokens is a clamped 0-20 number input. Deployed and prod-verified.
+Files changed: index.html, js/{jsonp,deezer,itunes,app,decks}.js, css/style.css, test/{deezer.test,itunes.test,decks.test,smoke}.mjs, package.json, README.md
+Tests run: npm test 40/40; smoke green incl. typed token count -> scoreboard dots; live: HUMBLE./In da Club/Espresso resolve explicit=true with previews; prod: tokens number field + deezer module served, In da Club resolves explicit from deployed origin
+Blockers: none
+Next steps: Jake: use Fix preview on any already-cached songs to upgrade them to explicit; genre decks resolve explicit automatically on first play
