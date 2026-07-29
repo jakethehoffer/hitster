@@ -6,7 +6,11 @@ base game's cards. Song search, release years, 30-second previews, and album
 art all come from the free iTunes Search API — no accounts, no API keys, no
 Spotify Premium.
 
-## How to run it
+**Play it now: https://jakethehoffer.github.io/hitster/** — no install, works
+on any phone/laptop/TV browser. Decks are saved per browser, so build your
+deck on the device you'll play from (or export/import it as JSON).
+
+## How to run it locally
 
 1. Open a terminal in this folder and run `npm start` (or any static server,
    e.g. `npx serve .`), then open the printed URL — usually
