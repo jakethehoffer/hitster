@@ -78,3 +78,10 @@ Created: 2026-07-28T21:24:34.3845104-04:00
 - tests run: npm test 44/44; smoke green with new steps: spacebar press, pre-lock dislike persists, both dislikes excluded then restored, editor thumbs-down excludes; prod serving spacebar handler + bumpRating
 - blockers: none
 - next steps: Jake: Decks -> Rap & Hip-Hop -> Edit -> thumbs-down Fight the Power
+
+### 2026-07-29T10:16:08.2893281-04:00 - claude - handoff
+- summary: Deck editor: live in-deck filter box (title/artist substring, original indices preserved so year-edit/delete stay correct, empty-state message, match count); iTunes add-box relabeled. Deployed.
+- files changed: index.html, js/app.js, test/smoke.mjs, README.md
+- tests run: npm test 44/44; smoke green incl. new step: filter narrows 24->1, year edit while filtered lands on the right song, clearing restores 24 rows; prod serving deck-filter input
+- blockers: none
+- next steps: none pending
