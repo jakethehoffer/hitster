@@ -183,6 +183,34 @@ await step('excluded badges show and Restore clears them', async () => {
   return page.evaluate(() =>
     !JSON.parse(localStorage.getItem('hitster.deck.t1')).songs.some((s) => (s.rating ?? 0) < 0));
 });
+await step('deck filter narrows the list and edits target the right song', async () => {
+  await page.evaluate(() => {
+    const f = document.querySelector('#deck-filter');
+    f.value = '1970';
+    f.dispatchEvent(new Event('input'));
+  });
+  const narrowed = await page.evaluate(() =>
+    document.querySelectorAll('#deck-songs .song-item').length === 1
+    && document.querySelector('#deck-song-count').textContent.includes('1 of 24'));
+  if (!narrowed) return false;
+  // edit the filtered row's year and confirm it lands on Song 1970, not row 0
+  await page.evaluate(() => {
+    const input = document.querySelector('#deck-songs .year-input');
+    input.value = '1971';
+    input.dispatchEvent(new Event('change'));
+  });
+  const edited = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('hitster.deck.t1')).songs
+      .find((s) => s.title === 'Song 1970').year === 1971);
+  await page.evaluate(() => {
+    const f = document.querySelector('#deck-filter');
+    f.value = '';
+    f.dispatchEvent(new Event('input'));
+  });
+  const restored = await page.evaluate(() =>
+    document.querySelectorAll('#deck-songs .song-item').length === 24);
+  return edited && restored;
+});
 await step('deck editor thumbs-down excludes directly', async () => {
   await page.evaluate(() => {
     const row = document.querySelector('#deck-songs .song-item');

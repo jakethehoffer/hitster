@@ -190,6 +190,7 @@ function openDeckEdit(id) {
   $('#deck-name-input').value = deck.name;
   clear($('#search-results'));
   $('#song-search').value = '';
+  $('#deck-filter').value = '';
   $('#search-status').classList.add('hidden');
   showScreen('deck-edit');
   renderDeckSongs();
@@ -204,10 +205,22 @@ function bumpRating(song, delta) {
 function renderDeckSongs() {
   const deck = getDeck(storage, editingDeckId);
   const excluded = excludedCount(deck.songs);
-  $('#deck-song-count').textContent = `${deck.songs.length} songs in this deck`
+  // Keep original indices: year-edit and delete address songs by position.
+  const term = $('#deck-filter').value.trim().toLowerCase();
+  const entries = deck.songs
+    .map((song, i) => ({ song, i }))
+    .filter(({ song }) => !term
+      || song.title.toLowerCase().includes(term)
+      || song.artist.toLowerCase().includes(term));
+  $('#deck-song-count').textContent = (term
+    ? `${entries.length} of ${deck.songs.length} songs match`
+    : `${deck.songs.length} songs in this deck`)
     + (excluded ? ` — ${excluded} excluded by 👎` : '');
   const list = clear($('#deck-songs'));
-  deck.songs.forEach((song, i) => {
+  if (term && entries.length === 0) {
+    list.append(el('li', { class: 'notice', text: 'No songs in this deck match — the box above searches iTunes to add new ones.' }));
+  }
+  entries.forEach(({ song, i }) => {
     const rating = song.rating ?? 0;
     const yearInput = el('input', {
       class: 'year-input', type: 'number', value: String(song.year),
@@ -967,6 +980,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('#search-status').classList.add('hidden');
     stopAudio();
   });
+  $('#deck-filter').addEventListener('input', renderDeckSongs);
 
   $('#btn-add-player').addEventListener('click', () => addPlayerRow());
   $('#setup-deck').addEventListener('change', updateDeckWarning);

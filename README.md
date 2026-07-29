@@ -60,10 +60,13 @@ on the home screen picks up where you left off.
 3. In the search box type a song — e.g. `mr brightside` — and press Enter.
 4. Each result shows the artwork, title, artist, and year, with a **▶** button
    to hear the preview. Click **+ Add** on the version you want.
-5. **Check the year.** iTunes sometimes reports a remaster or compilation date
+5. To find a song already in the deck (to re-rate it, fix its year, or cut
+   it), type in the **"Find in this deck"** box below the song count. It
+   filters the list live by title or artist.
+6. **Check the year.** iTunes sometimes reports a remaster or compilation date
    (e.g. "Take On Me (MTV Unplugged)" says 2017). The year box next to each
    deck song is editable — fix it there. The game trusts your deck's year.
-6. Aim for `players x cards-to-win + 10` songs or more (the setup screen warns
+7. Aim for `players x cards-to-win + 10` songs or more (the setup screen warns
    you if a deck is thin). 40–60 songs is a great party deck.
 
 **Sharing decks with friends:** click **Export** on a deck to download a

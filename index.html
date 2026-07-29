@@ -48,13 +48,16 @@
       <button id="btn-export-deck" class="btn">⇩ Export</button>
     </div>
     <div class="search-row">
-      <input id="song-search" type="text" placeholder="Search a song, e.g. 'mr brightside'…">
+      <input id="song-search" type="text" placeholder="Add songs: search iTunes, e.g. 'mr brightside'…">
       <button id="btn-search" class="btn btn-primary">Search</button>
       <button id="btn-clear-search" class="btn">✕ Clear</button>
     </div>
     <p id="search-status" class="notice hidden"></p>
     <ul id="search-results" class="song-list"></ul>
     <h3 id="deck-song-count"></h3>
+    <div class="search-row">
+      <input id="deck-filter" type="text" placeholder="Find in this deck: type a title or artist…">
+    </div>
     <p class="hint">Tip: iTunes sometimes reports a remaster or compilation year — double-check and edit the year box if it looks wrong.</p>
     <ul id="deck-songs" class="song-list"></ul>
   </section>
