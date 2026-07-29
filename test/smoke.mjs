@@ -59,7 +59,9 @@ await page.evaluate(() => {
     title: `Song ${1960 + i * 2}`, artist: 'Test Artist', year: 1960 + i * 2,
     previewUrl: 'data:audio/mp3;base64,AAAA',
   }));
-  localStorage.setItem('hitster.seedInstalled', '1');
+  for (const key of ['starter', 'rap', 'pop']) {
+    localStorage.setItem(`hitster.seedInstalled.${key}`, '1');
+  }
   localStorage.setItem('hitster.deckIndex', JSON.stringify(['t1']));
   localStorage.setItem('hitster.deck.t1', JSON.stringify({ id: 't1', name: 'Test Deck', songs }));
 });
@@ -121,6 +123,17 @@ while (turns < 80 && !won) {
   }
   // challenge phase (skipped automatically when nobody has tokens)
   if (await clickText('✨ Reveal!')) { /* revealed */ }
+  // exercise the like/dislike learning loop on turn 1
+  if (turns === 1) {
+    await clickText('👎 Cut it');
+    const rated = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('hitster.deck.t1')).songs.some((s) => s.rating === -1));
+    if (!rated) errors.push('dislike did not persist to stored deck');
+    else console.log('  ✔ dislike persisted to deck');
+    const downDisabled = await page.evaluate(() =>
+      [...document.querySelectorAll('button')].some((b) => b.textContent.includes('👎 Cut it') && b.disabled));
+    if (!downDisabled) errors.push('dislike button not disabled after vote');
+  }
   // every few turns, hand out a bonus token to keep challenges alive
   if (turns % 3 === 0) await clickText('+ ');
   if (!(await clickText('Next turn'))) { errors.push(`turn ${turns}: no next button`); break; }
@@ -149,6 +162,14 @@ await step('year edit persists', async () => {
     input.dispatchEvent(new Event('change'));
   });
   return page.evaluate(() => JSON.parse(localStorage.getItem('hitster.deck.t1')).songs.some((s) => s.year === 1999));
+});
+await step('disliked song shows excluded badge + restore works', async () => {
+  const hasBadge = await page.evaluate(() =>
+    [...document.querySelectorAll('.rating-badge.negative')].length > 0);
+  if (!hasBadge) return false;
+  await clickText('Restore');
+  return page.evaluate(() =>
+    !JSON.parse(localStorage.getItem('hitster.deck.t1')).songs.some((s) => (s.rating ?? 0) < 0));
 });
 
 await browser.close();

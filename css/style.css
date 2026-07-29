@@ -140,6 +140,8 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 .song-item .song-artist { color: var(--ink-dim); font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .song-item input.year-input { width: 5.2rem; text-align: center; }
 .song-item .song-year { color: var(--gold); font-weight: 700; }
+.rating-badge { color: var(--ok); font-size: .85rem; font-weight: 700; white-space: nowrap; }
+.rating-badge.negative { color: var(--bad); }
 
 /* ---------- setup ---------- */
 

@@ -37,7 +37,11 @@ Same as real Hitster:
    as correct). If you were wrong and a challenger was right, they steal it.
 6. If anyone named the artist **and** title out loud, tap their name under
    "Grab a token" (honor system). Tokens buy song skips and challenges.
-7. First to the target number of cards wins. If the deck runs out first, most
+7. On the reveal screen, vote **👍 Keep it** or **👎 Cut it** on the song
+   itself. Votes save to the deck: a net-disliked song sits out all future
+   games (the deck editor shows it as excluded, with a Restore button), so
+   decks improve every time you play.
+8. First to the target number of cards wins. If the deck runs out first, most
    cards wins (tokens break ties).
 
 The game autosaves after every move — if the browser closes, **Resume game**
@@ -60,8 +64,13 @@ on the home screen picks up where you left off.
 `.hitster.json` file, send it to a friend, and they click **⇪ Import JSON** on
 their Decks screen. Decks live in each browser's localStorage.
 
-A starter deck of well-known hits (1966–2024) is included as demo content —
-delete it once you've built your own.
+Three built-in decks are included: the **Starter deck** (well-known hits
+1966–2024), **Rap & Hip-Hop** (1979–2024), and **Pop Through the Decades**
+(1963–2024). They're normal decks — edit, prune with 👎 votes, or delete them.
+
+If a preview plays the wrong version of a song (remix, acapella, live), open
+the deck editor and hit the **↻** button on that song — it re-fetches the
+preview with a matcher that prefers the original recording.
 
 ## Development
 

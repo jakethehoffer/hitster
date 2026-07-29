@@ -5,7 +5,8 @@ import {
 import { searchSongs, resolvePreview } from './itunes.js';
 import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
-  exportDeck, parseDeckImport, ensureSeedDeck,
+  exportDeck, parseDeckImport, ensureSeedDecks,
+  playableSongs, excludedCount, rateSong,
 } from './decks.js';
 
 const SAVE_KEY = 'hitster.savedGame';
@@ -164,9 +165,12 @@ function openDeckEdit(id) {
 
 function renderDeckSongs() {
   const deck = getDeck(storage, editingDeckId);
-  $('#deck-song-count').textContent = `${deck.songs.length} songs in this deck`;
+  const excluded = excludedCount(deck.songs);
+  $('#deck-song-count').textContent = `${deck.songs.length} songs in this deck`
+    + (excluded ? ` — ${excluded} excluded by 👎` : '');
   const list = clear($('#deck-songs'));
   deck.songs.forEach((song, i) => {
+    const rating = song.rating ?? 0;
     const yearInput = el('input', {
       class: 'year-input', type: 'number', value: String(song.year),
       min: '1900', max: '2100',
@@ -188,6 +192,38 @@ function renderDeckSongs() {
       song.previewUrl
         ? el('button', { class: 'btn btn-small listen-btn', text: '▶', onclick: (e) => toggleListen(song.previewUrl, e.target) })
         : null,
+      el('button', {
+        class: 'btn btn-small', text: '↻', title: 'Re-fetch preview (fixes wrong versions)',
+        onclick: async (e) => {
+          e.target.disabled = true;
+          try {
+            const fresh = await resolvePreview({ ...song, previewUrl: undefined });
+            const d = getDeck(storage, editingDeckId);
+            const target = d.songs.find((s) => s.title === song.title && s.artist === song.artist);
+            if (target) {
+              target.previewUrl = fresh.previewUrl;
+              target.artworkUrl = fresh.artworkUrl || target.artworkUrl;
+              saveDeck(storage, d);
+            }
+            toast('Preview refreshed');
+            renderDeckSongs();
+          } catch (err) {
+            toast(`Couldn't refresh: ${err.message}`);
+            e.target.disabled = false;
+          }
+        },
+      }),
+      rating > 0 ? el('span', { class: 'rating-badge', text: `👍${rating}` }) : null,
+      rating < 0 ? el('span', { class: 'rating-badge negative', text: '👎 excluded' }) : null,
+      rating < 0 ? el('button', {
+        class: 'btn btn-small', text: 'Restore',
+        onclick: () => {
+          const d = getDeck(storage, editingDeckId);
+          const target = d.songs.find((s) => s.title === song.title && s.artist === song.artist);
+          if (target) { target.rating = 0; saveDeck(storage, d); }
+          renderDeckSongs();
+        },
+      }) : null,
       yearInput,
       el('button', {
         class: 'btn btn-small', text: '✕',
@@ -300,8 +336,15 @@ function updateDeckWarning() {
   const players = $('#player-inputs').children.length;
   const target = parseInt($('#setup-target').value, 10);
   const comfy = players * target + 10;
-  if (deck.songs.length < comfy) {
-    warning.textContent = `This deck has ${deck.songs.length} songs — comfortable for these settings is ${comfy}+. You can still play; the game ends early if songs run out (most cards wins).`;
+  const pool = playableSongs(deck.songs);
+  const excluded = deck.songs.length - pool.length;
+  const excludedNote = excluded
+    ? ` (${excluded} disliked song${excluded > 1 ? 's' : ''} excluded — restore in the deck editor)` : '';
+  if (pool.length < comfy) {
+    warning.textContent = `This deck has ${pool.length} playable songs${excludedNote} — comfortable for these settings is ${comfy}+. You can still play; the game ends early if songs run out (most cards wins).`;
+    warning.classList.remove('hidden');
+  } else if (excluded) {
+    warning.textContent = `${pool.length} playable songs${excludedNote}.`;
     warning.classList.remove('hidden');
   } else {
     warning.classList.add('hidden');
@@ -315,6 +358,7 @@ let gameDeckId = null;
 let selectedSlot = null;          // tentative slot during listening
 let selectedChallenger = null;    // player idx picking a challenge slot
 let bonusAwarded = new Set();
+let songVoted = { up: false, down: false }; // one 👍 and one 👎 per reveal
 let previewState = 'idle';        // idle | loading | ready | error
 
 function saveGame() {
@@ -328,9 +372,18 @@ function saveGame() {
 }
 
 function beginGame(deck, players, settings) {
+  // Disliked songs sit out — unless that would leave too few to play with.
+  const pool = playableSongs(deck.songs);
+  const excluded = deck.songs.length - pool.length;
+  const usable = pool.length >= players.length + 1 ? pool : deck.songs;
+  if (excluded > 0) {
+    toast(usable === pool
+      ? `${excluded} disliked song${excluded > 1 ? 's are' : ' is'} sitting this game out`
+      : 'Too few liked songs left — including disliked ones this game');
+  }
   game = createGame({
     players,
-    deck: deck.songs.map((s) => ({ ...s })),
+    deck: usable.map((s) => ({ ...s })),
     cardsToWin: settings.target,
     startTokens: settings.tokens,
     challengesEnabled: settings.challenges,
@@ -483,7 +536,30 @@ function renderPhase() {
         onclick: () => { awardBonus(game, i); bonusAwarded.add(i); saveGame(); renderGame(); },
       }));
     });
-    area.append(bonus,
+    const votes = el('div', { class: 'bonus-row' },
+      el('span', { class: 'label', text: 'Good pick for this deck?' }),
+      el('button', {
+        class: 'btn btn-small', text: '👍 Keep it',
+        disabled: songVoted.up ? 'true' : null,
+        onclick: () => {
+          songVoted.up = true;
+          const r = rateSong(storage, gameDeckId, lastRevealCard(), 1);
+          toast(r == null ? 'Deck no longer stored — vote not saved' : 'Noted 👍');
+          renderGame();
+        },
+      }),
+      el('button', {
+        class: 'btn btn-small', text: '👎 Cut it',
+        disabled: songVoted.down ? 'true' : null,
+        onclick: () => {
+          songVoted.down = true;
+          const r = rateSong(storage, gameDeckId, lastRevealCard(), -1);
+          toast(r == null ? 'Deck no longer stored — vote not saved'
+            : r < 0 ? 'Cut — it sits out future games (restore in the deck editor)' : 'Noted 👎');
+          renderGame();
+        },
+      }));
+    area.append(bonus, votes,
       el('div', { class: 'phase-controls' },
         el('button', { class: 'btn btn-primary btn-big', text: 'Next turn →', onclick: onNextTurn })));
   }
@@ -615,6 +691,7 @@ function onStartTurn() {
   selectedSlot = null;
   selectedChallenger = null;
   bonusAwarded = new Set();
+  songVoted = { up: false, down: false };
   startTurn(game);
   saveGame();
   loadMysteryPreview();
@@ -713,6 +790,7 @@ function resumeGame() {
     selectedSlot = null;
     selectedChallenger = null;
     bonusAwarded = new Set();
+    songVoted = { up: false, down: false };
     showScreen('game');
     if (game.phase === 'listening' || game.phase === 'challenge') {
       previewState = game.mystery && game.mystery.previewUrl ? 'ready' : 'idle';
@@ -729,7 +807,7 @@ function resumeGame() {
 // ---------- wiring ----------
 
 document.addEventListener('DOMContentLoaded', () => {
-  ensureSeedDeck(storage);
+  ensureSeedDecks(storage);
 
   document.querySelectorAll('[data-nav]').forEach((b) =>
     b.addEventListener('click', () => showScreen(b.dataset.nav)));

@@ -54,12 +54,50 @@ export async function searchSongs(term, { limit = 12 } = {}) {
     .map(toCard);
 }
 
-// Preview URLs are CDN links that can go stale. Re-find the song and return a
-// copy of the card with a fresh previewUrl (keeping the deck's curated year).
+// Alternate-version markers. A result whose title/artist contains one of these
+// when the requested song doesn't is almost never what you want to hear
+// (learned the hard way: iTunes ranks "Espresso (On Vacation Version)" above
+// the real "Espresso").
+const BAD_MARKERS = [
+  'karaoke', 'instrumental', 'acapella', 'a cappella', 'tribute', 'cover',
+  'remix', 'sped up', 'slowed', 'live', 'lullaby', '8-bit', 'version',
+  'in the style of', 'originally performed', 'made famous',
+];
+
+export function scoreMatch(card, result) {
+  const t = result.title.toLowerCase();
+  const a = result.artist.toLowerCase();
+  const wantT = card.title.toLowerCase();
+  const wantA = card.artist.toLowerCase();
+  let score = 0;
+  if (t === wantT) score += 6;
+  else if (t.startsWith(wantT)) score += 3;
+  else if (t.includes(wantT)) score += 1;
+  if (a === wantA) score += 6;
+  else if (a.includes(wantA) || wantA.includes(a)) score += 4;
+  for (const w of BAD_MARKERS) {
+    if (t.includes(w) && !wantT.includes(w)) score -= 5;
+    if (a.includes(w) && !wantA.includes(w)) score -= 5;
+  }
+  return score;
+}
+
+export function pickBestMatch(card, results) {
+  let best = null;
+  let bestScore = 0; // require a positive score — a bad match is worse than none
+  for (const r of results) {
+    const s = scoreMatch(card, r);
+    if (s > bestScore) { bestScore = s; best = r; }
+  }
+  return best;
+}
+
+// Preview URLs are CDN links that can go stale, and seed songs start without
+// one. Re-find the song and return a copy with a fresh previewUrl, keeping the
+// deck's curated year.
 export async function resolvePreview(card) {
-  const results = await searchSongs(`${card.title} ${card.artist}`, { limit: 5 });
-  const match = results.find((r) =>
-    r.title.toLowerCase().startsWith(card.title.toLowerCase().slice(0, 8))) || results[0];
+  const results = await searchSongs(`${card.title} ${card.artist}`, { limit: 12 });
+  const match = pickBestMatch(card, results);
   if (!match || !match.previewUrl) {
     throw new Error(`No preview found for "${card.title}"`);
   }
