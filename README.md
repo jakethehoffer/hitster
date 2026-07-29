@@ -2,9 +2,10 @@
 
 A digital version of the music timeline party game Hitster, built for playing
 with friends on one shared screen, with **your own song decks** instead of the
-base game's cards. Song search, release years, 30-second previews, and album
-art all come from the free iTunes Search API — no accounts, no API keys, no
-Spotify Premium.
+base game's cards. Song search, release years, and album art come from the
+free iTunes Search API; 30-second preview audio resolves from Deezer first so
+you get the **original (explicit) versions** — Apple's search API only serves
+censored tracks. No accounts, no API keys, no Spotify Premium.
 
 **Play it now: https://jakethehoffer.github.io/hitster/** — no install, works
 on any phone/laptop/TV browser. Decks are saved per browser, so build your
@@ -26,7 +27,8 @@ audio) over Discord for remote friends.
 Same as real Hitster:
 
 1. **New game** → pick a deck, add 2–8 players (a "player" can be a team),
-   choose cards-to-win (10 is classic), press **Start game**.
+   choose cards-to-win (10 is classic) and type any starting-token count
+   (0–20), press **Start game**.
 2. On your turn press **Draw a song**, then **Play song**. A mystery song
    plays — no title, no artist, no year.
 3. Tap the slot in your timeline where you think the song belongs

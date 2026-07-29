@@ -93,9 +93,12 @@ await step('back home', async () => clickText('← Back'));
 await step('open setup', async () => { await clickText('▶ New game'); return visible('#setup-deck'); });
 await step('deck in select', () => page.$eval('#setup-deck', (s) => s.options.length === 1 && s.textContent.includes('Test Deck')));
 
-// quick game: 5 cards to win
+// quick game: 5 cards to win, custom token count via the type-in field
 await page.select('#setup-target', '5');
+await page.evaluate(() => { document.querySelector('#setup-tokens').value = '4'; });
 await step('start game', async () => { await clickText('Start game'); return visible('#scoreboard'); });
+await step('custom token count applied', () => page.evaluate(() =>
+  [...document.querySelectorAll('.player-chip .chip-tokens')].every((n) => n.textContent === '●'.repeat(4))));
 
 console.log('smoke: play to the end');
 let turns = 0;

@@ -95,6 +95,7 @@ export function parseDeckImport(jsonString) {
       previewUrl: typeof s.previewUrl === 'string' ? s.previewUrl : undefined,
       artworkUrl: typeof s.artworkUrl === 'string' ? s.artworkUrl : undefined,
       rating: Number.isInteger(s.rating) ? s.rating : undefined,
+      explicit: s.explicit === true ? true : undefined,
     })),
   };
 }

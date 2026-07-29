@@ -38,13 +38,14 @@ test('deleteDeck removes deck and index entry', () => {
   assert.equal(getDeck(storage, deck.id), null);
 });
 
-test('exportDeck/parseDeckImport roundtrip preserves songs and ratings', () => {
-  const deck = { id: 'x', name: 'Mix', songs: [{ title: 'T', artist: 'A', year: 2001, previewUrl: 'http://p', artworkUrl: 'http://a', rating: -1 }] };
+test('exportDeck/parseDeckImport roundtrip preserves songs, ratings, and explicitness', () => {
+  const deck = { id: 'x', name: 'Mix', songs: [{ title: 'T', artist: 'A', year: 2001, previewUrl: 'http://p', artworkUrl: 'http://a', rating: -1, explicit: true }] };
   const parsed = parseDeckImport(exportDeck(deck));
   assert.equal(parsed.name, 'Mix');
   assert.equal(parsed.songs.length, 1);
   assert.equal(parsed.songs[0].year, 2001);
   assert.equal(parsed.songs[0].rating, -1);
+  assert.equal(parsed.songs[0].explicit, true);
   assert.notEqual(parsed.id, 'x'); // import mints a fresh id to avoid collisions
 });
 

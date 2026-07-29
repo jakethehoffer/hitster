@@ -1,36 +1,8 @@
-// iTunes Search API via JSONP. The API sends no CORS headers, so fetch/XHR
-// fail from a browser — script-tag injection works everywhere, file:// included.
-
-let jsonpCounter = 0;
-
-function jsonp(url, timeoutMs = 10000) {
-  return new Promise((resolve, reject) => {
-    jsonpCounter += 1;
-    const cbName = `__hitsterJsonp${jsonpCounter}`;
-    const script = document.createElement('script');
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error('Search timed out'));
-    }, timeoutMs);
-
-    function cleanup() {
-      clearTimeout(timer);
-      delete window[cbName];
-      script.remove();
-    }
-
-    window[cbName] = (data) => {
-      cleanup();
-      resolve(data);
-    };
-    script.onerror = () => {
-      cleanup();
-      reject(new Error('Search request failed'));
-    };
-    script.src = `${url}&callback=${cbName}`;
-    document.head.appendChild(script);
-  });
-}
+// iTunes Search API — the deck builder's search/metadata source (release
+// years, artwork). Note it only returns clean/censored tracks now, so
+// preview AUDIO resolves Deezer-first in resolvePreview below.
+import { jsonp } from './jsonp.js';
+import { searchDeezer } from './deezer.js';
 
 function toCard(result) {
   return {
@@ -41,6 +13,7 @@ function toCard(result) {
     artworkUrl: result.artworkUrl100
       ? result.artworkUrl100.replace('100x100', '300x300')
       : undefined,
+    explicit: result.trackExplicitness === 'explicit' ? true : undefined,
   };
 }
 
@@ -79,6 +52,8 @@ export function scoreMatch(card, result) {
     if (t.includes(w) && !wantT.includes(w)) score -= 5;
     if (a.includes(w) && !wantA.includes(w)) score -= 5;
   }
+  // Prefer the explicit original over radio/clean edits when otherwise equal.
+  if (result.explicit) score += 2;
   return score;
 }
 
@@ -94,12 +69,30 @@ export function pickBestMatch(card, results) {
 
 // Preview URLs are CDN links that can go stale, and seed songs start without
 // one. Re-find the song and return a copy with a fresh previewUrl, keeping the
-// deck's curated year.
+// deck's curated year. Deezer first (it has the original/explicit versions;
+// iTunes search is clean-only), iTunes as fallback.
 export async function resolvePreview(card) {
+  try {
+    const dz = await searchDeezer(`${card.title} ${card.artist}`, { limit: 12 });
+    const match = pickBestMatch(card, dz);
+    if (match && match.previewUrl) {
+      return {
+        ...card,
+        previewUrl: match.previewUrl,
+        artworkUrl: card.artworkUrl || match.artworkUrl,
+        explicit: match.explicit,
+      };
+    }
+  } catch { /* Deezer down — fall through to iTunes */ }
   const results = await searchSongs(`${card.title} ${card.artist}`, { limit: 12 });
   const match = pickBestMatch(card, results);
   if (!match || !match.previewUrl) {
     throw new Error(`No preview found for "${card.title}"`);
   }
-  return { ...card, previewUrl: match.previewUrl, artworkUrl: card.artworkUrl || match.artworkUrl };
+  return {
+    ...card,
+    previewUrl: match.previewUrl,
+    artworkUrl: card.artworkUrl || match.artworkUrl,
+    explicit: match.explicit,
+  };
 }

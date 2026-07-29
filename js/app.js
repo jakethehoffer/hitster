@@ -191,7 +191,8 @@ function renderDeckSongs() {
     list.append(el('li', { class: 'song-item' },
       song.artworkUrl ? el('img', { src: song.artworkUrl, alt: '' }) : null,
       el('div', { class: 'song-text' },
-        el('div', { class: 'song-title', text: song.title }),
+        el('div', { class: 'song-title' },
+          song.title, song.explicit ? el('span', { class: 'explicit-badge', text: '🅴' }) : null),
         el('div', { class: 'song-artist', text: song.artist })),
       song.previewUrl
         ? el('button', { class: 'btn btn-small listen-btn', text: '▶', onclick: (e) => toggleListen(song.previewUrl, e.target) })
@@ -207,6 +208,7 @@ function renderDeckSongs() {
             if (target) {
               target.previewUrl = fresh.previewUrl;
               target.artworkUrl = fresh.artworkUrl || target.artworkUrl;
+              target.explicit = fresh.explicit;
               saveDeck(storage, d);
             }
             toast('Preview refreshed');
@@ -263,6 +265,25 @@ async function runSearch() {
   }
 }
 
+// iTunes search only serves clean/censored previews, so after adding a song
+// we quietly swap in the original (explicit where it exists) from Deezer.
+function upgradeToOriginalPreview(card) {
+  const deckId = editingDeckId;
+  resolvePreview({ title: card.title, artist: card.artist, year: card.year })
+    .then((fresh) => {
+      const d = getDeck(storage, deckId);
+      if (!d || !fresh.previewUrl) return;
+      const target = d.songs.find((s) => sameSong(s, card));
+      if (!target) return;
+      target.previewUrl = fresh.previewUrl;
+      target.explicit = fresh.explicit;
+      target.artworkUrl = target.artworkUrl || fresh.artworkUrl;
+      saveDeck(storage, d);
+      if (editingDeckId === deckId) renderDeckSongs();
+    })
+    .catch(() => { /* keep the iTunes preview */ });
+}
+
 function renderSearchResults(results) {
   const list = clear($('#search-results'));
   const deckSongs = getDeck(storage, editingDeckId).songs;
@@ -280,6 +301,7 @@ function renderSearchResults(results) {
           if (!target) return;
           target.previewUrl = card.previewUrl;
           target.artworkUrl = card.artworkUrl || target.artworkUrl;
+          target.explicit = card.explicit;
           saveDeck(storage, d);
           toast(`"${target.title}" will now play this version`);
           renderDeckSongs();
@@ -302,12 +324,14 @@ function renderSearchResults(results) {
           toast(`Added "${card.title}" (${card.year}) — edit the year if that's a re-release date`);
           renderDeckSongs();
           renderSearchResults(results); // the added song's row flips to "use this preview"
+          upgradeToOriginalPreview(card);
         },
       });
     list.append(el('li', { class: 'song-item' },
       card.artworkUrl ? el('img', { src: card.artworkUrl, alt: '' }) : null,
       el('div', { class: 'song-text' },
-        el('div', { class: 'song-title', text: card.title }),
+        el('div', { class: 'song-title' },
+          card.title, card.explicit ? el('span', { class: 'explicit-badge', text: '🅴' }) : null),
         el('div', { class: 'song-artist', text: card.artist })),
       el('span', { class: 'song-year', text: String(card.year ?? '?') }),
       el('button', { class: 'btn btn-small listen-btn', text: '▶', onclick: (e) => toggleListen(card.previewUrl, e.target) }),
@@ -711,6 +735,7 @@ function cachePreviewToDeck(card) {
   if (song && !song.previewUrl) {
     song.previewUrl = card.previewUrl;
     song.artworkUrl = song.artworkUrl || card.artworkUrl;
+    song.explicit = card.explicit;
     saveDeck(storage, deck);
   }
 }
@@ -895,9 +920,12 @@ document.addEventListener('DOMContentLoaded', () => {
       toast(`"${deck.name}" needs at least ${players.length + 1} songs for ${players.length} players.`);
       return;
     }
+    const rawTokens = parseInt($('#setup-tokens').value, 10);
+    const tokens = Number.isInteger(rawTokens) ? Math.min(20, Math.max(0, rawTokens)) : 2;
+    $('#setup-tokens').value = String(tokens);
     beginGame(deck, players, {
       target: parseInt($('#setup-target').value, 10),
-      tokens: parseInt($('#setup-tokens').value, 10),
+      tokens,
       challenges: $('#setup-challenges').checked,
     });
   });

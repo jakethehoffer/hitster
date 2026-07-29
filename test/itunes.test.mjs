@@ -48,6 +48,24 @@ test('a requested special version is not penalized for its own marker', () => {
   assert.ok(s >= 12);
 });
 
+test('explicit original beats the clean edit when otherwise identical', () => {
+  const card = { title: 'HUMBLE.', artist: 'Kendrick Lamar' };
+  const best = pickBestMatch(card, [
+    { title: 'HUMBLE.', artist: 'Kendrick Lamar', previewUrl: 'clean' },
+    { title: 'HUMBLE.', artist: 'Kendrick Lamar', previewUrl: 'explicit', explicit: true },
+  ]);
+  assert.equal(best.previewUrl, 'explicit');
+});
+
+test('explicit bonus does not rescue a karaoke or wrong-version result', () => {
+  const card = { title: 'HUMBLE.', artist: 'Kendrick Lamar' };
+  const best = pickBestMatch(card, [
+    { title: 'HUMBLE. (Karaoke Version)', artist: 'Party Crew', previewUrl: 'k', explicit: true },
+    { title: 'HUMBLE.', artist: 'Kendrick Lamar', previewUrl: 'real' },
+  ]);
+  assert.equal(best.previewUrl, 'real');
+});
+
 test('pickBestMatch returns null when nothing plausible matches', () => {
   assert.equal(pickBestMatch(want, [
     { title: 'Completely Different Song', artist: 'Nobody' },
