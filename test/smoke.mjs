@@ -107,6 +107,12 @@ while (turns < 80 && !won) {
   turns += 1;
   if (!(await clickText('▶ Draw a song'))) { errors.push(`turn ${turns}: no draw button`); break; }
   await page.waitForFunction(() => document.querySelector('.slot:not([disabled])'), { timeout: 5000 });
+  // spacebar toggles playback during a turn (must not crash or scroll away)
+  if (turns === 1) await page.keyboard.press('Space');
+  // rate the song BEFORE locking in (listening-phase vote row)
+  if (turns === 3) {
+    if (!(await clickText('👎 Cut it'))) errors.push('no pre-lock dislike button in listening phase');
+  }
   // place into the first open slot (often wrong on purpose — exercises discard + steal paths)
   await page.evaluate(() => document.querySelector('.slot:not([disabled])').click());
   if (!(await clickText('Lock it in'))) { errors.push(`turn ${turns}: no lock button`); break; }
@@ -166,13 +172,24 @@ await step('year edit persists', async () => {
   });
   return page.evaluate(() => JSON.parse(localStorage.getItem('hitster.deck.t1')).songs.some((s) => s.year === 1999));
 });
-await step('disliked song shows excluded badge + restore works', async () => {
+await step('both dislikes persisted (reveal vote + pre-lock vote)', () =>
+  page.evaluate(() =>
+    JSON.parse(localStorage.getItem('hitster.deck.t1')).songs.filter((s) => (s.rating ?? 0) < 0).length === 2));
+await step('excluded badges show and Restore clears them', async () => {
   const hasBadge = await page.evaluate(() =>
-    [...document.querySelectorAll('.rating-badge.negative')].length > 0);
+    document.querySelectorAll('.rating-badge.negative').length === 2);
   if (!hasBadge) return false;
-  await clickText('Restore');
+  for (let i = 0; i < 5 && await clickText('Restore'); i++) { /* restore each */ }
   return page.evaluate(() =>
     !JSON.parse(localStorage.getItem('hitster.deck.t1')).songs.some((s) => (s.rating ?? 0) < 0));
+});
+await step('deck editor thumbs-down excludes directly', async () => {
+  await page.evaluate(() => {
+    const row = document.querySelector('#deck-songs .song-item');
+    [...row.querySelectorAll('button')].find((b) => b.textContent === '👎').click();
+  });
+  return page.evaluate(() =>
+    JSON.parse(localStorage.getItem('hitster.deck.t1')).songs.filter((s) => (s.rating ?? 0) < 0).length === 1);
 });
 
 await browser.close();

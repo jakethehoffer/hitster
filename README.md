@@ -30,7 +30,8 @@ Same as real Hitster:
    choose cards-to-win (10 is classic) and type any starting-token count
    (0–20), press **Start game**.
 2. On your turn press **Draw a song**, then **Play song**. A mystery song
-   plays — no title, no artist, no year.
+   plays — no title, no artist, no year. Pause and resume anytime with the
+   button or the **spacebar** (it picks up where it left off).
 3. Tap the slot in your timeline where you think the song belongs
    (before/between/after your cards), then press **Lock it in**.
 4. Anyone else who thinks you're wrong can **challenge** for 1 token: tap
@@ -40,10 +41,12 @@ Same as real Hitster:
    as correct). If you were wrong and a challenger was right, they steal it.
 6. If anyone named the artist **and** title out loud, tap their name under
    "Grab a token" (honor system). Tokens buy song skips and challenges.
-7. On the reveal screen, vote **👍 Keep it** or **👎 Cut it** on the song
-   itself. Votes save to the deck: a net-disliked song sits out all future
-   games (the deck editor shows it as excluded, with a Restore button), so
-   decks improve every time you play.
+7. Vote **👍 Keep it** or **👎 Cut it** on the song itself — available while
+   it's still playing (before you lock in) and on the reveal screen. Votes
+   save to the deck: a net-disliked song sits out all future games (the deck
+   editor shows it as excluded, with a Restore button), so decks improve
+   every time you play. You can also 👍/👎 any song directly in the deck
+   editor — handy when you forgot to vote during the game.
 8. First to the target number of cards wins. If the deck runs out first, most
    cards wins (tokens break ties).
 

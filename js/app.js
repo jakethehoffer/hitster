@@ -85,22 +85,50 @@ function stopAudio() {
 
 function toggleListen(url, btn) {
   const p = document.getElementById('player');
-  if (playingUrl === url && !p.paused) {
-    stopAudio();
+  if (playingUrl === url) {
+    // Same track: true pause/resume — keep the position, don't restart.
+    if (p.paused) {
+      p.play().catch(() => toast('Could not play preview'));
+      if (btn) { btn.classList.add('playing'); btn.textContent = '⏸'; }
+    } else {
+      p.pause();
+      if (btn) { btn.classList.remove('playing'); btn.textContent = '▶'; }
+    }
     return;
   }
   stopAudio();
   p.src = url;
+  p.currentTime = 0;
   p.play().catch(() => toast('Could not play preview'));
   playingUrl = url;
   if (btn) { btn.classList.add('playing'); btn.textContent = '⏸'; }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('player').addEventListener('ended', () => {
+  const p = document.getElementById('player');
+  p.addEventListener('ended', () => {
     stopAudio();
     if (game && (game.phase === 'listening' || game.phase === 'challenge')) renderPhase();
   });
+  // Keep the vinyl spin and Play/Pause labels in sync however playback was
+  // triggered (button or spacebar).
+  for (const evt of ['play', 'pause']) {
+    p.addEventListener(evt, () => {
+      if (game && (game.phase === 'listening' || game.phase === 'challenge')) renderPhase();
+    });
+  }
+});
+
+// Spacebar = pause/resume the mystery song during a turn. Ignored while
+// typing; overrides button focus so space never "re-clicks" the last button.
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space') return;
+  if (e.target.closest('input, textarea, select')) return;
+  if (!game || (game.phase !== 'listening' && game.phase !== 'challenge')) return;
+  if (previewState !== 'ready' || !game.mystery || !game.mystery.previewUrl) return;
+  if (document.querySelector('[data-screen="game"]').classList.contains('hidden')) return;
+  e.preventDefault();
+  toggleListen(game.mystery.previewUrl, null);
 });
 
 // ---------- home ----------
@@ -167,6 +195,12 @@ function openDeckEdit(id) {
   renderDeckSongs();
 }
 
+function bumpRating(song, delta) {
+  const r = rateSong(storage, editingDeckId, song, delta);
+  if (r != null && r < 0) toast(`"${song.title}" will sit out future games`);
+  renderDeckSongs();
+}
+
 function renderDeckSongs() {
   const deck = getDeck(storage, editingDeckId);
   const excluded = excludedCount(deck.songs);
@@ -218,6 +252,14 @@ function renderDeckSongs() {
             e.target.disabled = false;
           }
         },
+      }),
+      el('button', {
+        class: 'btn btn-small', text: '👍', title: 'Like this pick',
+        onclick: () => bumpRating(song, 1),
+      }),
+      el('button', {
+        class: 'btn btn-small', text: '👎', title: 'Dislike — net-disliked songs sit out of games',
+        onclick: () => bumpRating(song, -1),
       }),
       rating > 0 ? el('span', { class: 'rating-badge', text: `👍${rating}` }) : null,
       rating < 0 ? el('span', { class: 'rating-badge negative', text: '👎 excluded' }) : null,
@@ -524,11 +566,12 @@ function renderPhase() {
       area.append(
         el('h2', { class: 'phase-title' }, el('span', { class: 'who', text: activeName() }), ' — where does it go?'),
         controls,
-        el('p', { class: 'phase-sub', text: 'Tap a slot in your timeline below, then lock it in.' }));
+        el('p', { class: 'phase-sub', text: 'Tap a slot in your timeline below, then lock it in. Spacebar pauses/plays.' }));
       if (selectedSlot != null) {
         area.append(el('div', { class: 'phase-controls' },
           el('button', { class: 'btn btn-primary btn-big', text: '🔒 Lock it in', onclick: onLockPlacement })));
       }
+      area.append(buildVoteRow());
       return;
     }
 
@@ -564,8 +607,10 @@ function renderPhase() {
     if (game.challenges.length > 0) {
       area.append(el('p', { class: 'phase-sub', text: 'Challenges: ' + game.challenges.map((c) => game.players[c.player].name).join(', ') }));
     }
-    area.append(el('div', { class: 'phase-controls' },
-      el('button', { class: 'btn btn-primary btn-big', text: '✨ Reveal!', onclick: onReveal })));
+    area.append(
+      el('div', { class: 'phase-controls' },
+        el('button', { class: 'btn btn-primary btn-big', text: '✨ Reveal!', onclick: onReveal })),
+      buildVoteRow());
     return;
   }
 
@@ -596,33 +641,39 @@ function renderPhase() {
         onclick: () => { awardBonus(game, i); bonusAwarded.add(i); saveGame(); renderGame(); },
       }));
     });
-    const votes = el('div', { class: 'bonus-row' },
-      el('span', { class: 'label', text: 'Good pick for this deck?' }),
-      el('button', {
-        class: 'btn btn-small', text: '👍 Keep it',
-        disabled: songVoted.up ? 'true' : null,
-        onclick: () => {
-          songVoted.up = true;
-          const r = rateSong(storage, gameDeckId, lastRevealCard(), 1);
-          toast(r == null ? 'Deck no longer stored — vote not saved' : 'Noted 👍');
-          renderGame();
-        },
-      }),
-      el('button', {
-        class: 'btn btn-small', text: '👎 Cut it',
-        disabled: songVoted.down ? 'true' : null,
-        onclick: () => {
-          songVoted.down = true;
-          const r = rateSong(storage, gameDeckId, lastRevealCard(), -1);
-          toast(r == null ? 'Deck no longer stored — vote not saved'
-            : r < 0 ? 'Cut — it sits out future games (restore in the deck editor)' : 'Noted 👎');
-          renderGame();
-        },
-      }));
-    area.append(bonus, votes,
+    area.append(bonus, buildVoteRow(),
       el('div', { class: 'phase-controls' },
         el('button', { class: 'btn btn-primary btn-big', text: 'Next turn →', onclick: onNextTurn })));
   }
+}
+
+// 👍/👎 for the current song — available while it plays (before you know what
+// it is) and at reveal. One vote each per song.
+function buildVoteRow() {
+  const card = game.phase === 'reveal' ? lastRevealCard() : game.mystery;
+  return el('div', { class: 'bonus-row' },
+    el('span', { class: 'label', text: 'Good pick for this deck?' }),
+    el('button', {
+      class: 'btn btn-small', text: '👍 Keep it',
+      disabled: songVoted.up ? 'true' : null,
+      onclick: () => {
+        songVoted.up = true;
+        const r = rateSong(storage, gameDeckId, card, 1);
+        toast(r == null ? 'Deck no longer stored — vote not saved' : 'Noted 👍');
+        renderGame();
+      },
+    }),
+    el('button', {
+      class: 'btn btn-small', text: '👎 Cut it',
+      disabled: songVoted.down ? 'true' : null,
+      onclick: () => {
+        songVoted.down = true;
+        const r = rateSong(storage, gameDeckId, card, -1);
+        toast(r == null ? 'Deck no longer stored — vote not saved'
+          : r < 0 ? 'Cut — it sits out future games (restore in the deck editor)' : 'Noted 👎');
+        renderGame();
+      },
+    }));
 }
 
 // The card that was just revealed: it moved into a timeline or the discard.
@@ -763,6 +814,7 @@ function onSkip() {
     stopAudio();
     skipSong(game);
     selectedSlot = null;
+    songVoted = { up: false, down: false }; // fresh song, fresh votes
     saveGame();
     loadMysteryPreview();
   } catch (err) { toast(err.message); }
@@ -773,6 +825,7 @@ function onFreeSkip() {
     stopAudio();
     freeSkip(game);
     selectedSlot = null;
+    songVoted = { up: false, down: false };
     saveGame();
     loadMysteryPreview();
   } catch (err) { toast(err.message); }
