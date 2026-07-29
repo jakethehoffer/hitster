@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hitster — Party Edition</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+</head>
+<body>
+
+<main>
+
+  <!-- ============ HOME ============ -->
+  <section data-screen="home" class="screen">
+    <div class="hero">
+      <h1 class="logo">HITSTER</h1>
+      <p class="tagline">the music timeline party game — your songs, your rules</p>
+      <div class="hero-buttons">
+        <button id="btn-new-game" class="btn btn-primary btn-big">▶ New game</button>
+        <button id="btn-resume" class="btn btn-big hidden">↻ Resume game</button>
+        <button id="btn-decks" class="btn btn-big">♫ Decks</button>
+      </div>
+      <p id="storage-notice" class="notice hidden">Heads up: browser storage is unavailable — decks and saves won't survive a refresh.</p>
+    </div>
+  </section>
+
+  <!-- ============ DECKS ============ -->
+  <section data-screen="decks" class="screen hidden">
+    <div class="screen-head">
+      <button class="btn btn-back" data-nav="home">← Back</button>
+      <h2>Your decks</h2>
+    </div>
+    <div class="deck-actions">
+      <input id="new-deck-name" type="text" placeholder="New deck name…" maxlength="40">
+      <button id="btn-create-deck" class="btn btn-primary">+ Create</button>
+      <button id="btn-import-deck" class="btn">⇪ Import JSON</button>
+      <input id="import-file" type="file" accept=".json,application/json" class="hidden">
+    </div>
+    <ul id="deck-list" class="deck-list"></ul>
+  </section>
+
+  <!-- ============ DECK EDIT ============ -->
+  <section data-screen="deck-edit" class="screen hidden">
+    <div class="screen-head">
+      <button class="btn btn-back" data-nav="decks">← Decks</button>
+      <input id="deck-name-input" type="text" maxlength="40" class="deck-name-input">
+      <button id="btn-export-deck" class="btn">⇩ Export</button>
+    </div>
+    <div class="search-row">
+      <input id="song-search" type="text" placeholder="Search a song, e.g. 'mr brightside'…">
+      <button id="btn-search" class="btn btn-primary">Search</button>
+    </div>
+    <p id="search-status" class="notice hidden"></p>
+    <ul id="search-results" class="song-list"></ul>
+    <h3 id="deck-song-count"></h3>
+    <p class="hint">Tip: iTunes sometimes reports a remaster or compilation year — double-check and edit the year box if it looks wrong.</p>
+    <ul id="deck-songs" class="song-list"></ul>
+  </section>
+
+  <!-- ============ SETUP ============ -->
+  <section data-screen="setup" class="screen hidden">
+    <div class="screen-head">
+      <button class="btn btn-back" data-nav="home">← Back</button>
+      <h2>New game</h2>
+    </div>
+    <div class="setup-grid">
+      <label class="setup-field">
+        <span>Deck</span>
+        <select id="setup-deck"></select>
+      </label>
+      <label class="setup-field">
+        <span>Cards to win</span>
+        <select id="setup-target">
+          <option value="5">5 — quick</option>
+          <option value="10" selected>10 — classic</option>
+          <option value="15">15 — marathon</option>
+        </select>
+      </label>
+      <label class="setup-field">
+        <span>Starting tokens</span>
+        <select id="setup-tokens">
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+        </select>
+      </label>
+      <label class="setup-field setup-check">
+        <input id="setup-challenges" type="checkbox" checked>
+        <span>Challenges (steal with a token)</span>
+      </label>
+    </div>
+    <h3>Players</h3>
+    <div id="player-inputs" class="player-inputs"></div>
+    <button id="btn-add-player" class="btn">+ Add player</button>
+    <p id="deck-warning" class="notice hidden"></p>
+    <button id="btn-start-game" class="btn btn-primary btn-big">Start game ▶</button>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <section data-screen="game" class="screen hidden">
+    <div id="scoreboard" class="scoreboard"></div>
+    <div id="phase-area" class="phase-area"></div>
+    <div id="timeline-area" class="timeline-area"></div>
+    <div class="game-footer">
+      <span id="draw-count"></span>
+      <button id="btn-quit" class="btn btn-small">✕ End game</button>
+    </div>
+  </section>
+
+  <!-- ============ WIN ============ -->
+  <section data-screen="win" class="screen hidden">
+    <div class="hero">
+      <h1 id="win-title" class="logo logo-small"></h1>
+      <div id="win-timelines"></div>
+      <div class="hero-buttons">
+        <button id="btn-play-again" class="btn btn-primary btn-big">Play again</button>
+        <button class="btn btn-big" data-nav="home">Home</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast" class="toast hidden"></div>
+<audio id="player" preload="auto"></audio>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
