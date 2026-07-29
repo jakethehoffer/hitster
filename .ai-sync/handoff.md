@@ -25,3 +25,11 @@ Files changed: js/{itunes,seed-deck,decks,app}.js, css/style.css, test/{itunes.t
 Tests run: npm test 35/35; npm run smoke full E2E green incl. dislike persistence + restore; live matcher check picks original Espresso from real iTunes results; prod verify: 3 decks on fresh browser, rap deck live preview resolved, vote row present, zero console errors
 Blockers: none
 Next steps: Jake: hit the ↻ button on Espresso in his browser's starter deck to purge the cached wrong preview; rap+pop decks auto-install on his next visit. Possible later: per-player vote weighting, genre deck for country/rock
+
+## 2026-07-28T23:52:15.9533518-04:00 - claude
+
+Summary: UX fix after Jake could not find the preview-refresh button: search results for songs already in the deck now show a 'Use this preview' button (points the deck copy at that exact version), the in-deck button is labeled 'Fix preview', and search results have a Clear button. Deployed to GitHub Pages.
+Files changed: index.html, js/app.js, README.md
+Tests run: npm test 35/35; npm run smoke green; live browser test: in-deck Espresso row shows Use-this-preview while alternates show +Add, click persists previewUrl+artwork, Clear empties results; prod build built and serving new app.js
+Blockers: none
+Next steps: Jake: search espresso in the starter deck editor and click 'Use this preview' on the plain Espresso row
