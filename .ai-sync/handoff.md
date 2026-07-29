@@ -49,3 +49,11 @@ Files changed: js/engine.js, js/app.js, test/engine.test.mjs, README.md, docs sp
 Tests run: npm test 44/44 (4 new refund tests: steal+refund, wrong loses, tie refund, mixed challengers); smoke green; prod serving refund engine
 Blockers: none
 Next steps: none pending — play it
+
+## 2026-07-29T00:18:11.9390343-04:00 - claude
+
+Summary: Playback + rating UX: true pause/resume (position kept) with spacebar toggle during turns; vote row now in listening/challenge phases so songs can be rated before lock-in (votes reset per song incl. skips); deck editor rows have direct thumbs up/down for retroactive votes. Deployed.
+Files changed: js/app.js, test/smoke.mjs, README.md
+Tests run: npm test 44/44; smoke green with new steps: spacebar press, pre-lock dislike persists, both dislikes excluded then restored, editor thumbs-down excludes; prod serving spacebar handler + bumpRating
+Blockers: none
+Next steps: Jake: Decks -> Rap & Hip-Hop -> Edit -> thumbs-down Fight the Power
