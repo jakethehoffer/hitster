@@ -65,3 +65,11 @@ Files changed: index.html, js/app.js, test/smoke.mjs, README.md
 Tests run: npm test 44/44; smoke green incl. new step: filter narrows 24->1, year edit while filtered lands on the right song, clearing restores 24 rows; prod serving deck-filter input
 Blockers: none
 Next steps: none pending
+
+## 2026-07-30T19:52:38.8067787-04:00 - claude
+
+Summary: Steal-or-pay rule (only successful steals refund the token), free skip whenever preview audio fails (retry once with fresh lookup, purge stale cached URL, hide paid skip), 3 new decks (Rock Anthems 50, R&B & Soul 45, Throwbacks 42) + starter/rap/pop expanded to 61 each with versioned top-up that preserves user ratings/edits and respects deletions. Deployed and prod-verified.
+Files changed: js/{engine,app,decks,seed-deck}.js, test/{engine.test,decks.test,smoke}.mjs, README.md, docs spec
+Tests run: npm test 46/46; smoke green; live seed sample 8/8 resolve previews; prod: fresh install = 6 decks with correct sizes, simulated old install tops rap 1->61 keeping rating -1, deletions stay deleted, no dupes
+Blockers: none
+Next steps: Jake refreshes: gets 3 new decks + ~60 new songs across existing decks, ratings intact
