@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import { extname, join, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
+import { SEED_DECKS } from '../js/seed-deck.js';
 
 const ROOT = normalize(join(dirname(fileURLToPath(import.meta.url)), '..'));
 const EDGE = [
@@ -53,18 +54,19 @@ await page.goto(`http://localhost:${port}/`, { waitUntil: 'networkidle0' });
 
 // Install a deterministic test deck (with fake previews so no iTunes calls),
 // and mark the seed as installed so only the test deck exists.
-await page.evaluate(() => {
+await page.evaluate((seeds) => {
   localStorage.clear();
   const songs = Array.from({ length: 24 }, (_, i) => ({
     title: `Song ${1960 + i * 2}`, artist: 'Test Artist', year: 1960 + i * 2,
     previewUrl: 'data:audio/mp3;base64,AAAA',
   }));
-  for (const key of ['starter', 'rap', 'pop']) {
-    localStorage.setItem(`hitster.seedInstalled.${key}`, '1');
+  for (const s of seeds) {
+    localStorage.setItem(`hitster.seedInstalled.${s.key}`, '1');
+    localStorage.setItem(`hitster.seedVersion.${s.key}`, String(s.version));
   }
   localStorage.setItem('hitster.deckIndex', JSON.stringify(['t1']));
   localStorage.setItem('hitster.deck.t1', JSON.stringify({ id: 't1', name: 'Test Deck', songs }));
-});
+}, SEED_DECKS.map((s) => ({ key: s.key, version: s.version })));
 await page.reload({ waitUntil: 'networkidle0' });
 
 const visible = (sel) => page.$eval(sel, (n) => !n.closest('.hidden') && n.offsetParent !== null).catch(() => false);

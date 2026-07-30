@@ -146,14 +146,6 @@ export function resolveTurn(state) {
     ...c,
     correct: isSlotCorrect(active.timeline, card, c.slot),
   }));
-  // House rule: a challenge token is only lost on a wrong guess.
-  const refunded = [];
-  for (const c of judged) {
-    if (c.correct) {
-      state.players[c.player].tokens += 1;
-      refunded.push(c.player);
-    }
-  }
   let stolenBy = null;
   let discarded = false;
 
@@ -169,6 +161,10 @@ export function resolveTurn(state) {
       state.discard.push(card);
     }
   }
+  // House rule: only a SUCCESSFUL steal keeps its token. Every failed
+  // challenge (wrong slot, or right slot without winning the card) pays.
+  const refunded = stolenBy != null ? [stolenBy] : [];
+  if (stolenBy != null) state.players[stolenBy].tokens += 1;
   state.outcome = { activeCorrect, stolenBy, discarded, refunded };
   state.phase = 'reveal';
 }

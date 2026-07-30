@@ -88,7 +88,7 @@ function toggleListen(url, btn) {
   if (playingUrl === url) {
     // Same track: true pause/resume — keep the position, don't restart.
     if (p.paused) {
-      p.play().catch(() => toast('Could not play preview'));
+      p.play().catch(() => onPlaybackFailure(url));
       if (btn) { btn.classList.add('playing'); btn.textContent = '⏸'; }
     } else {
       p.pause();
@@ -99,9 +99,44 @@ function toggleListen(url, btn) {
   stopAudio();
   p.src = url;
   p.currentTime = 0;
-  p.play().catch(() => toast('Could not play preview'));
+  p.play().catch(() => onPlaybackFailure(url));
   playingUrl = url;
   if (btn) { btn.classList.add('playing'); btn.textContent = '⏸'; }
+}
+
+// A preview that fails at PLAY time (stale CDN link, network hiccup) must
+// never cost a token: retry with a fresh lookup once, then offer a free skip.
+function onPlaybackFailure(url) {
+  const inTurn = game && (game.phase === 'listening' || game.phase === 'challenge');
+  if (inTurn && game.mystery && url === game.mystery.previewUrl) {
+    handleMysteryAudioFailure();
+  } else {
+    toast('Could not play preview');
+  }
+}
+
+let mysteryRetried = false;
+
+function handleMysteryAudioFailure() {
+  const failedUrl = game.mystery.previewUrl;
+  stopAudio();
+  // Purge the stale URL from the stored deck so the re-lookup replaces it.
+  const deck = getDeck(storage, gameDeckId);
+  if (deck) {
+    const song = deck.songs.find((s) => sameSong(s, game.mystery));
+    if (song && song.previewUrl === failedUrl) {
+      song.previewUrl = undefined;
+      saveDeck(storage, deck);
+    }
+  }
+  if (!mysteryRetried) {
+    mysteryRetried = true;
+    game.mystery.previewUrl = undefined;
+    loadMysteryPreview();
+  } else {
+    previewState = 'error';
+    renderGame();
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -117,6 +152,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (game && (game.phase === 'listening' || game.phase === 'challenge')) renderPhase();
     });
   }
+  // Media element errors (bad/stale src) route to the free-skip path in-game.
+  p.addEventListener('error', () => {
+    if (playingUrl) onPlaybackFailure(playingUrl);
+  });
 });
 
 // Spacebar = pause/resume the mystery song during a turn. Ignored while
@@ -569,7 +608,7 @@ function renderPhase() {
           onclick: () => { const pl = document.getElementById('player'); pl.currentTime = 0; pl.play(); renderPhase(); },
         }));
       }
-      if (game.drawPile.length > 0) {
+      if (previewState !== 'error' && game.drawPile.length > 0) {
         controls.append(el('button', {
           class: 'btn', text: `⤳ Skip song (1 token)`,
           disabled: active.tokens < 1 ? 'true' : null,
@@ -604,7 +643,7 @@ function renderPhase() {
         && !game.challenges.some((c) => c.player === i));
     if (game.settings.challengesEnabled && eligible.length > 0) {
       const picker = el('div', { class: 'challenge-picker' },
-        el('span', { class: 'phase-sub', text: 'Challenge (1 token — back if you’re right): ' }));
+        el('span', { class: 'phase-sub', text: 'Challenge (1 token — back only if you steal it): ' }));
       for (const { pl, i } of eligible) {
         picker.append(el('button', {
           class: `btn${selectedChallenger === i ? ' picked' : ''}`,
@@ -634,16 +673,9 @@ function renderPhase() {
     if (o.activeCorrect) {
       area.append(el('p', { class: 'outcome good', text: `✔ ${activeName()} nailed it — card claimed!` }));
     } else if (o.stolenBy != null) {
-      area.append(el('p', { class: 'outcome steal', text: `⚡ Stolen by ${game.players[o.stolenBy].name}!` }));
+      area.append(el('p', { class: 'outcome steal', text: `⚡ Stolen by ${game.players[o.stolenBy].name} — token back!` }));
     } else {
       area.append(el('p', { class: 'outcome bad', text: '✘ Nobody got it — into the bin.' }));
-    }
-    const refunded = o.refunded || [];
-    if (refunded.length > 0) {
-      area.append(el('p', {
-        class: 'phase-sub',
-        text: `Right guess — token back: ${refunded.map((i) => game.players[i].name).join(', ')}`,
-      }));
     }
     const bonus = el('div', { class: 'bonus-row' },
       el('span', { class: 'label', text: 'Named artist + title? Grab a token:' }));
@@ -817,6 +849,7 @@ function onStartTurn() {
   selectedChallenger = null;
   bonusAwarded = new Set();
   songVoted = { up: false, down: false };
+  mysteryRetried = false;
   startTurn(game);
   saveGame();
   loadMysteryPreview();
@@ -828,6 +861,7 @@ function onSkip() {
     skipSong(game);
     selectedSlot = null;
     songVoted = { up: false, down: false }; // fresh song, fresh votes
+    mysteryRetried = false;
     saveGame();
     loadMysteryPreview();
   } catch (err) { toast(err.message); }
@@ -839,6 +873,7 @@ function onFreeSkip() {
     freeSkip(game);
     selectedSlot = null;
     songVoted = { up: false, down: false };
+    mysteryRetried = false;
     saveGame();
     loadMysteryPreview();
   } catch (err) { toast(err.message); }
@@ -918,6 +953,7 @@ function resumeGame() {
     selectedChallenger = null;
     bonusAwarded = new Set();
     songVoted = { up: false, down: false };
+    mysteryRetried = false;
     showScreen('game');
     if (game.phase === 'listening' || game.phase === 'challenge') {
       previewState = game.mystery && game.mystery.previewUrl ? 'ready' : 'idle';

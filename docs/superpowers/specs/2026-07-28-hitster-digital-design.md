@@ -36,9 +36,10 @@ scope — possible later on Cloudflare Durable Objects without changing the engi
 - **Challenge (optional, default on):** after the active player locks a slot,
   any other player may spend 1 token to claim a *different* slot in the active
   player's timeline. Multiple challengers allowed; each must pick a distinct slot.
-  House rule (2026-07-29): a challenge token is only lost on a wrong guess — any
-  challenger whose slot was correct gets it back at reveal, even when the active
-  player also placed correctly (tie years).
+  House rule (2026-07-30, supersedes 07-29): only a SUCCESSFUL steal returns
+  its token. Every failed challenge pays — wrong slot, a valid slot when the
+  active player was also correct (tie years), or a correct slot beaten by an
+  earlier challenger.
 - **Reveal:** placement is correct if the song's year fits between its neighbors,
   inclusive on ties (equal years are correct on either side).
   - Active player correct → card joins their timeline at that spot.

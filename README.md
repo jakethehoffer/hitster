@@ -35,8 +35,8 @@ Same as real Hitster:
 3. Tap the slot in your timeline where you think the song belongs
    (before/between/after your cards), then press **Lock it in**.
 4. Anyone else who thinks you're wrong can **challenge** for 1 token: tap
-   their name, then the slot they think is right. A correct challenge gets
-   the token back — you only lose it on a wrong guess.
+   their name, then the slot they think is right. A successful steal gets
+   the token back; any failed challenge loses it.
 5. **Reveal!** Correct placement keeps the card (ties on the same year count
    as correct). If you were wrong and a challenger was right, they steal it.
 6. If anyone named the artist **and** title out loud, tap their name under
@@ -73,9 +73,13 @@ on the home screen picks up where you left off.
 `.hitster.json` file, send it to a friend, and they click **⇪ Import JSON** on
 their Decks screen. Decks live in each browser's localStorage.
 
-Three built-in decks are included: the **Starter deck** (well-known hits
-1966–2024), **Rap & Hip-Hop** (1979–2024), and **Pop Through the Decades**
-(1963–2024). They're normal decks — edit, prune with 👎 votes, or delete them.
+Six built-in decks are included, each big enough for a game to 10 cards:
+the **Starter deck** (61 hits, 1966–2024), **Rap & Hip-Hop** (61, 1979–2024),
+**Pop Through the Decades** (61, 1963–2024), **Rock Anthems** (50, 1965–2020),
+**R&B & Soul** (45, 1961–2023), and **2000s & 2010s Throwbacks** (42).
+They're normal decks — edit, prune with 👎 votes, or delete them. When an
+update adds songs to a built-in deck, your copy gets the new songs on next
+load with all your ratings and edits kept.
 
 If a preview plays the wrong version of a song (remix, acapella, live), fix it
 either way: search the song in the deck editor and click **↻ Use this preview**
@@ -97,6 +101,8 @@ recording).
 
 - Song previews are 30-second clips (usually the hook — plenty to guess with).
 - Artist/title bonus tokens are honor-system; the app doesn't verify.
-- Previews stream from Apple's CDN, so playing needs internet.
+- Previews stream from Deezer/Apple CDNs, so playing needs internet. If a
+  preview can't load or dies mid-turn, the game re-finds it automatically and
+  otherwise offers a **free** skip — broken audio never costs a token.
 - To deploy for everyone (no local server), any static host works — e.g.
   Cloudflare Pages: point it at this folder, no build command.

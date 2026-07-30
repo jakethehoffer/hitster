@@ -5,6 +5,7 @@ const INDEX_KEY = 'hitster.deckIndex';
 const DECK_PREFIX = 'hitster.deck.';
 const LEGACY_SEED_FLAG = 'hitster.seedInstalled';
 const SEED_FLAG_PREFIX = 'hitster.seedInstalled.';
+const SEED_VERSION_PREFIX = 'hitster.seedVersion.';
 
 let idCounter = 0;
 function freshId() {
@@ -127,7 +128,9 @@ export function rateSong(storage, deckId, card, delta) {
 // ---------- built-in decks ----------
 
 // Installs each built-in deck on first ever run. Deleting one keeps it
-// deleted — the flag records "installed once", not "should exist".
+// deleted — the flag records "installed once", not "should exist". When a
+// seed's `version` is bumped, already-installed copies get the new songs
+// appended (matched by title+artist, so user ratings/previews/edits stay).
 export function ensureSeedDecks(storage) {
   // Migrate the pre-genre-decks flag so existing browsers don't get a
   // duplicate starter deck.
@@ -137,10 +140,34 @@ export function ensureSeedDecks(storage) {
   }
   for (const seed of SEED_DECKS) {
     const flag = SEED_FLAG_PREFIX + seed.key;
-    if (storage.getItem(flag)) continue;
-    const deck = createDeck(storage, seed.name);
-    deck.songs = seed.songs.map((s) => ({ ...s }));
-    saveDeck(storage, deck);
-    storage.setItem(flag, '1');
+    const verKey = SEED_VERSION_PREFIX + seed.key;
+    if (!storage.getItem(flag)) {
+      const deck = createDeck(storage, seed.name);
+      deck.seedKey = seed.key;
+      deck.songs = seed.songs.map((s) => ({ ...s }));
+      saveDeck(storage, deck);
+      storage.setItem(flag, '1');
+      storage.setItem(verKey, String(seed.version));
+      continue;
+    }
+    const installedVersion = parseInt(storage.getItem(verKey) || '1', 10);
+    if (installedVersion >= seed.version) continue;
+    // Find the user's copy: seedKey when present, exact default name as the
+    // fallback for pre-versioning installs. Deleted/renamed decks stay as
+    // the user left them.
+    const decks = listDecks(storage);
+    const mine = decks.find((d) => d.seedKey === seed.key)
+      || decks.find((d) => d.name === seed.name);
+    if (mine) {
+      const have = new Set(mine.songs.map((s) => `${s.title.toLowerCase()}|${s.artist.toLowerCase()}`));
+      for (const s of seed.songs) {
+        if (!have.has(`${s.title.toLowerCase()}|${s.artist.toLowerCase()}`)) {
+          mine.songs.push({ ...s });
+        }
+      }
+      mine.seedKey = seed.key;
+      saveDeck(storage, mine);
+    }
+    storage.setItem(verKey, String(seed.version));
   }
 }

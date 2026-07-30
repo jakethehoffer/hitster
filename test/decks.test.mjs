@@ -74,22 +74,46 @@ test('ensureSeedDecks installs all built-in decks exactly once', () => {
   assert.equal(listDecks(storage).length, SEED_DECKS.length - 1);
 });
 
-test('legacy single-flag browsers get the new genre decks but no duplicate starter', () => {
+test('legacy single-flag browsers get new decks, no duplicate starter, and a topped-up starter', () => {
   const storage = makeStorage();
   // simulate a pre-genre-decks install: starter deck exists, legacy flag set
-  const old = createDeck(storage, 'Starter deck (replace with your taste!)');
+  createDeck(storage, 'Starter deck (replace with your taste!)');
   storage.setItem('hitster.seedInstalled', '1');
   ensureSeedDecks(storage);
   const decks = listDecks(storage);
-  assert.equal(decks.length, SEED_DECKS.length); // old starter + rap + pop, no duplicate
-  assert.equal(decks.filter((d) => d.name.startsWith('Starter deck')).length, 1);
+  assert.equal(decks.length, SEED_DECKS.length);
+  const starters = decks.filter((d) => d.name.startsWith('Starter deck'));
+  assert.equal(starters.length, 1);
+  // version bump top-up filled the old (empty) starter with the current seed
+  assert.equal(starters[0].songs.length, SEED_DECKS[0].songs.length);
   assert.ok(decks.some((d) => d.name === 'Rap & Hip-Hop'));
-  assert.ok(decks.some((d) => d.name === 'Pop Through the Decades'));
+  assert.ok(decks.some((d) => d.name === 'Rock Anthems'));
+  assert.ok(decks.some((d) => d.name === '2000s & 2010s Throwbacks'));
 });
 
-test('seed decks are well-formed, unique within a deck, and span decades', () => {
+test('version top-up appends new songs but preserves user ratings and previews', () => {
+  const storage = makeStorage();
+  // a pre-versioning install: deck exists under the seed name with one edited song
+  const seed = SEED_DECKS[1]; // rap
+  const deck = createDeck(storage, seed.name);
+  deck.songs.push({ ...seed.songs[0], rating: -3, previewUrl: 'http://my-preview' });
+  saveDeck(storage, deck);
+  storage.setItem(`hitster.seedInstalled.${seed.key}`, '1'); // installed at version 1
+  ensureSeedDecks(storage);
+  const after = listDecks(storage).find((d) => d.name === seed.name);
+  assert.equal(after.songs.length, seed.songs.length); // topped up, no duplicate of song 0
+  assert.equal(after.songs[0].rating, -3); // user edits untouched
+  assert.equal(after.songs[0].previewUrl, 'http://my-preview');
+  // idempotent: running again changes nothing
+  ensureSeedDecks(storage);
+  assert.equal(listDecks(storage).find((d) => d.name === seed.name).songs.length, seed.songs.length);
+});
+
+test('seed decks are well-formed, unique within a deck, sized for a game to 10', () => {
   for (const seed of SEED_DECKS) {
-    assert.ok(seed.songs.length >= 30, `${seed.name} too small`);
+    // 3 players to 10 cards needs ~40 songs; every deck must clear that
+    assert.ok(seed.songs.length >= 40, `${seed.name} too small: ${seed.songs.length}`);
+    assert.ok(Number.isInteger(seed.version) && seed.version >= 1, `${seed.name} missing version`);
     const keys = new Set();
     for (const s of seed.songs) {
       assert.equal(typeof s.title, 'string');
@@ -100,7 +124,7 @@ test('seed decks are well-formed, unique within a deck, and span decades', () =>
       keys.add(k);
     }
     const years = seed.songs.map((s) => s.year);
-    assert.ok(Math.max(...years) - Math.min(...years) >= 40, `${seed.name} span too narrow`);
+    assert.ok(Math.max(...years) - Math.min(...years) >= 15, `${seed.name} span too narrow`);
   }
 });
 

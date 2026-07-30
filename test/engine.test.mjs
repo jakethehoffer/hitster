@@ -250,7 +250,7 @@ test('a wrong challenger loses the token', () => {
   assert.equal(s.players[1].tokens, 1); // spent, not returned
 });
 
-test('tie years: active keeps the card but a also-correct challenger is refunded', () => {
+test('tie years: a failed steal loses the token even if the slot was technically valid', () => {
   const s = freshGame();
   s.players[0].timeline = [card(1980), card(1990), card(2000)];
   startTurn(s);
@@ -260,11 +260,11 @@ test('tie years: active keeps the card but a also-correct challenger is refunded
   resolveTurn(s);
   assert.equal(s.outcome.activeCorrect, true);
   assert.equal(s.outcome.stolenBy, null);
-  assert.deepEqual(s.outcome.refunded, [1]);
-  assert.equal(s.players[1].tokens, 2);
+  assert.deepEqual(s.outcome.refunded, []); // no steal happened -> no refund
+  assert.equal(s.players[1].tokens, 1);
 });
 
-test('mixed challengers: only the correct one is refunded, first correct steals', () => {
+test('mixed challengers: only the successful stealer keeps their token', () => {
   const s = createGame({ players: ['A', 'B', 'C'], deck: makeDeck(25), rngSeed: 5 });
   s.players[0].timeline = [card(1980), card(2000)];
   startTurn(s);
@@ -277,6 +277,21 @@ test('mixed challengers: only the correct one is refunded, first correct steals'
   assert.deepEqual(s.outcome.refunded, [2]);
   assert.equal(s.players[1].tokens, 1); // lost
   assert.equal(s.players[2].tokens, 2); // refunded
+});
+
+test('two correct challengers: first steals and is refunded, second loses the token', () => {
+  const s = createGame({ players: ['A', 'B', 'C'], deck: makeDeck(25), rngSeed: 5 });
+  s.players[0].timeline = [card(1980), card(1990), card(2000)];
+  startTurn(s);
+  s.mystery = card(1990);
+  placeCard(s, 0); // wrong
+  addChallenge(s, 2, 1); // correct, first in order
+  addChallenge(s, 1, 2); // also correct, second
+  resolveTurn(s);
+  assert.equal(s.outcome.stolenBy, 2);
+  assert.deepEqual(s.outcome.refunded, [2]);
+  assert.equal(s.players[2].tokens, 2); // stole -> token back
+  assert.equal(s.players[1].tokens, 1); // right slot, no steal -> token gone
 });
 
 // --- bonus tokens ---
