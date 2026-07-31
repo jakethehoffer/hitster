@@ -81,3 +81,11 @@ Files changed: js/app.js, test/smoke.mjs, README.md
 Tests run: npm test 46/46; smoke green incl. live assertion that a gibberish song is retired from the pile before draw; prod serving prefetch code
 Blockers: none
 Next steps: none pending
+
+## 2026-07-31T02:27:49.9978434-04:00 - claude
+
+Summary: Endless decks: when the pile drops below 6, refillDeck discovers up to 5 songs by artists already in the deck (Deezer artist search + album-year lookup, alt-cut/compilation filters), adds them to pile bottom AND the stored deck (votes work, decks grow each game), tagged as new discovery at reveal. Setup toggle default on; exhaustion rules remain offline fallback. Also fixed: Deezer error payloads (rate-limit quota) now throw instead of reading as empty - a quota blip could previously retire a real song via prefetch. Deployed.
+Files changed: js/{engine,app,deezer,itunes}.js, index.html, test/{engine.test,deezer.test,smoke}.mjs, README.md, docs spec
+Tests run: npm test 48/48; smoke green incl. live refill assertion (Dua Lipa artist radar grows pile+stored deck with real years, quota-retry hardened); prod serving endless toggle + refill code
+Blockers: none
+Next steps: none pending
