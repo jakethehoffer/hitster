@@ -73,3 +73,11 @@ Files changed: js/{engine,app,decks,seed-deck}.js, test/{engine.test,decks.test,
 Tests run: npm test 46/46; smoke green; live seed sample 8/8 resolve previews; prod: fresh install = 6 decks with correct sizes, simulated old install tops rap 1->61 keeping rating -1, deletions stay deleted, no dupes
 Blockers: none
 Next steps: Jake refreshes: gets 3 new decks + ~60 new songs across existing decks, ratings intact
+
+## 2026-07-31T02:12:04.0913631-04:00 - claude
+
+Summary: Preview reliability overhaul: previews for upcoming pile cards resolve in background (prefetchUpcoming, called on game start/resume/next-turn/mystery-load); definitive lookup misses retire the card to discard unseen, transient failures demote to pile bottom for retry; counter-only UI refresh to avoid yanking mid-click renders; window.__hitster debug hook for E2E. Root cause was draw-time lazy resolution. Deployed.
+Files changed: js/app.js, test/smoke.mjs, README.md
+Tests run: npm test 46/46; smoke green incl. live assertion that a gibberish song is retired from the pile before draw; prod serving prefetch code
+Blockers: none
+Next steps: none pending
