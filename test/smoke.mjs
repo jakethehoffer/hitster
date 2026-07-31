@@ -222,6 +222,25 @@ await step('deck editor thumbs-down excludes directly', async () => {
     JSON.parse(localStorage.getItem('hitster.deck.t1')).songs.filter((s) => (s.rating ?? 0) < 0).length === 1);
 });
 
+// A song no source can resolve must be quietly retired from the pile —
+// players should never see the "preview unavailable" screen for it.
+await step('unresolvable song is retired before anyone draws it', async () => {
+  await clickText('← Decks');
+  await clickText('← Back');
+  await clickText('▶ New game');
+  await clickText('Start game');
+  return page.evaluate(async () => {
+    const g = window.__hitster.game;
+    if (!g) return false;
+    const bad = { title: 'zqxvbnq wertyzzq unfindable', artist: 'nonexistent band xyzzy', year: 1999 };
+    g.drawPile.push(bad); // top of the pile = the very next draw
+    for (let i = 0; i < 5 && g.drawPile.includes(bad); i++) {
+      await window.__hitster.prefetch(1);
+    }
+    return !g.drawPile.includes(bad) && g.discard.includes(bad);
+  });
+});
+
 await browser.close();
 server.close();
 

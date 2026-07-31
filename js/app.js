@@ -540,6 +540,7 @@ function beginGame(deck, players, settings) {
   showScreen('game');
   renderGame();
   saveGame();
+  prefetchUpcoming();
 }
 
 function renderGame() {
@@ -826,6 +827,54 @@ async function loadMysteryPreview() {
   }
   saveGame();
   renderGame();
+  prefetchUpcoming(); // warm the next songs while this one plays
+}
+
+// Resolve previews AHEAD of the draw so nobody ever faces an unavailable
+// song: warm up the next few cards of the pile in the background. A card
+// whose lookup definitively finds nothing is quietly retired to the discard;
+// a transient failure demotes it to the bottom for another try later.
+let prefetching = false;
+
+async function prefetchUpcoming(count = 3) {
+  if (!game || prefetching) return;
+  prefetching = true;
+  try {
+    // cards are drawn from the END of drawPile
+    const targets = game.drawPile.slice(-count).reverse();
+    for (const card of targets) {
+      if (!game || card.previewUrl || card === game.mystery) continue;
+      try {
+        const fresh = await resolvePreview(card);
+        if (!game) return;
+        card.previewUrl = fresh.previewUrl;
+        card.artworkUrl = card.artworkUrl || fresh.artworkUrl;
+        card.explicit = fresh.explicit;
+        cachePreviewToDeck(card);
+      } catch (err) {
+        if (!game) return;
+        const at = game.drawPile.indexOf(card);
+        if (at < 0) continue; // drawn while we were looking — in-turn handling owns it
+        card.prefetchFails = (card.prefetchFails || 0) + 1;
+        const definitiveMiss = /No preview found/.test(err.message);
+        if (definitiveMiss || card.prefetchFails >= 2) {
+          game.drawPile.splice(at, 1);
+          game.discard.push(card); // retired: the players never see it
+        } else {
+          game.drawPile.splice(at, 1);
+          game.drawPile.unshift(card); // bottom of the pile, retry later
+        }
+      }
+      saveGame();
+    }
+    // refresh only the pile counter — a full re-render could yank buttons
+    // out from under a mid-click player
+    if (game && game.phase !== 'gameover') {
+      $('#draw-count').textContent = `${game.drawPile.length} songs left in the pile`;
+    }
+  } finally {
+    prefetching = false;
+  }
 }
 
 // Write a freshly resolved preview URL back into the stored deck so the next
@@ -905,7 +954,10 @@ function onNextTurn() {
   nextTurn(game);
   saveGame();
   if (game.phase === 'gameover') showWin();
-  else renderGame();
+  else {
+    renderGame();
+    prefetchUpcoming();
+  }
 }
 
 // ---------- win ----------
@@ -960,6 +1012,7 @@ function resumeGame() {
       if (previewState === 'idle') loadMysteryPreview();
     }
     renderGame();
+    prefetchUpcoming();
   } catch {
     toast('Saved game was unreadable — starting fresh.');
     storage.removeItem(SAVE_KEY);
@@ -1053,3 +1106,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   showScreen('home');
 });
+
+// Read-only-ish debug hook so the E2E smoke test can assert on real internals.
+window.__hitster = {
+  get game() { return game; },
+  prefetch: (n) => prefetchUpcoming(n),
+};

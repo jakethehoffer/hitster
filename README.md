@@ -101,8 +101,10 @@ recording).
 
 - Song previews are 30-second clips (usually the hook — plenty to guess with).
 - Artist/title bonus tokens are honor-system; the app doesn't verify.
-- Previews stream from Deezer/Apple CDNs, so playing needs internet. If a
-  preview can't load or dies mid-turn, the game re-finds it automatically and
-  otherwise offers a **free** skip — broken audio never costs a token.
+- Previews stream from Deezer/Apple CDNs, so playing needs internet. The game
+  resolves previews for upcoming cards ahead of the draw; a song no source can
+  find is quietly set aside so nobody ever draws it. If audio still breaks
+  mid-turn (rare), it re-finds the preview automatically and otherwise offers
+  a **free** skip — broken audio never costs a token.
 - To deploy for everyone (no local server), any static host works — e.g.
   Cloudflare Pages: point it at this folder, no build command.
