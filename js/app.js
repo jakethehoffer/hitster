@@ -540,6 +540,7 @@ function beginGame(deck, players, settings) {
     startTokens: settings.tokens,
     challengesEnabled: settings.challenges,
     endless: settings.endless,
+    hardDraws: settings.hardDraws,
     rngSeed: Math.floor(Math.random() * 2 ** 31),
   });
   gameDeckId = deck.id;
@@ -910,6 +911,12 @@ async function refillDeck() {
     ];
     const seen = new Set(knownSongs.map((s) => `${s.title.toLowerCase()}|${s.artist.toLowerCase()}`));
     const artists = [...new Set(knownSongs.map((s) => s.artist))];
+    // Prefer discoveries inside the deck's era span, so hard draws keep
+    // getting close-call candidates instead of outliers.
+    const knownYears = knownSongs.map((s) => s.year).filter(Number.isInteger);
+    const loYear = Math.min(...knownYears) - 10;
+    const hiYear = Math.max(...knownYears) + 10;
+    let spare = null; // first out-of-span find, used only if nothing fits
     let added = 0;
     // up to 6 distinct artists, in random order, until the batch is filled
     const tryArtists = artists.slice().sort(() => Math.random() - 0.5).slice(0, 6);
@@ -934,6 +941,10 @@ async function refillDeck() {
           previewUrl: c.previewUrl, artworkUrl: c.artworkUrl,
           explicit: c.explicit, auto: true,
         };
+        if (year < loYear || year > hiYear) {
+          if (!spare) spare = card;
+          continue;
+        }
         seen.add(key);
         game.drawPile.unshift(card); // bottom of the pile
         if (deck) {
@@ -942,6 +953,14 @@ async function refillDeck() {
         }
         added += 1;
       }
+    }
+    if (added === 0 && spare && game) {
+      game.drawPile.unshift(spare);
+      if (deck) {
+        deck.songs.push({ ...spare });
+        saveDeck(storage, deck);
+      }
+      added = 1;
     }
     if (added && game) {
       saveGame();
@@ -1169,6 +1188,7 @@ document.addEventListener('DOMContentLoaded', () => {
       tokens,
       challenges: $('#setup-challenges').checked,
       endless: $('#setup-endless').checked,
+      hardDraws: $('#setup-hard').checked,
     });
   });
 

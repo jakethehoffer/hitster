@@ -28,6 +28,7 @@ export function createGame({
   startTokens = 2,
   challengesEnabled = true,
   endless = true,
+  hardDraws = true,
   rngSeed = 1,
 }) {
   if (!Array.isArray(players) || players.length < 2 || players.length > 8) {
@@ -54,8 +55,49 @@ export function createGame({
     challenges: [],
     outcome: null,
     winners: null,
-    settings: { cardsToWin, startTokens, challengesEnabled, endless },
+    settings: { cardsToWin, startTokens, challengesEnabled, endless, hardDraws },
+    rngState: rngSeed + 1,
   };
+}
+
+// Serializable PRNG step (same mulberry32 core) so hard draws stay random
+// but survive save/resume.
+function nextRand(state) {
+  let a = (state.rngState ?? 1) >>> 0;
+  a |= 0; a = (a + 0x6D2B79F5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  state.rngState = a;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+// Hard draws: never hand the player an obvious placement. Cards are scored by
+// distance from the nearest year in the player's timeline; the draw comes
+// randomly from the close-call pool (within hardWindow years), or from the
+// few least-obvious cards available when nothing is that close.
+export function pickHardIndex(drawPile, timeline, rand, { hardWindow = 7, poolMin = 3 } = {}) {
+  const years = timeline.map((c) => c.year);
+  const scored = drawPile
+    .map((c, i) => ({ i, d: Math.min(...years.map((t) => Math.abs(c.year - t))) }))
+    .sort((a, b) => a.d - b.d);
+  let pool = scored.filter((s) => s.d <= hardWindow);
+  if (pool.length === 0) {
+    // nothing close in the pile: settle for the least-obvious few
+    pool = scored.slice(0, Math.min(poolMin, scored.length));
+  }
+  return pool[Math.floor(rand * pool.length)].i;
+}
+
+function drawCard(state) {
+  if (state.settings.hardDraws) {
+    const idx = pickHardIndex(
+      state.drawPile,
+      state.players[state.current].timeline,
+      nextRand(state),
+    );
+    return state.drawPile.splice(idx, 1)[0];
+  }
+  return state.drawPile.pop();
 }
 
 function requirePhase(state, phase) {
@@ -79,7 +121,7 @@ export function insertIntoTimeline(timeline, card) {
 export function startTurn(state) {
   requirePhase(state, 'idle');
   if (state.drawPile.length === 0) throw new Error('Draw pile empty');
-  state.mystery = state.drawPile.pop();
+  state.mystery = drawCard(state);
   state.placedSlot = null;
   state.challenges = [];
   state.outcome = null;
@@ -90,7 +132,7 @@ function redraw(state) {
   requirePhase(state, 'listening');
   if (state.drawPile.length === 0) throw new Error('Draw pile empty');
   state.discard.push(state.mystery);
-  state.mystery = state.drawPile.pop();
+  state.mystery = drawCard(state);
 }
 
 export function skipSong(state) {

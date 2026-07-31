@@ -50,6 +50,12 @@ scope — possible later on Cloudflare Durable Objects without changing the engi
   named the artist *and* title (honor system — tap their name).
 - **Win:** first player to reach the win target (default 10 cards, configurable
   5/10/15). If the deck runs out first, most cards wins; ties broken by tokens.
+- **Hard draws (added 2026-07-31, default on):** instead of drawing blind, the
+  engine scores every pile card by distance from the nearest year in the
+  active player's timeline and draws randomly among cards within 7 years of
+  one; when nothing is that close it takes the closest 3 available. Uses a
+  serializable PRNG in game state so save/resume stays consistent. Toggle in
+  setup; off restores plain top-of-pile draws.
 - **Endless deck (added 2026-07-31, default on):** when the draw pile drops
   below 6 cards, the app discovers up to 5 new songs by artists already in the
   deck via Deezer artist search, filtering alternate cuts and compilation

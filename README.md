@@ -31,7 +31,10 @@ Same as real Hitster:
    (0–20), press **Start game**.
 2. On your turn press **Draw a song**, then **Play song**. A mystery song
    plays — no title, no artist, no year. Pause and resume anytime with the
-   button or the **spacebar** (it picks up where it left off).
+   button or the **spacebar** (it picks up where it left off). With **Hard
+   draws** on (the default), the game picks songs whose years land close to
+   the cards already in your timeline — placements are always a genuine call,
+   never a gimme decades outside your range.
 3. Tap the slot in your timeline where you think the song belongs
    (before/between/after your cards), then press **Lock it in**.
 4. Anyone else who thinks you're wrong can **challenge** for 1 token: tap

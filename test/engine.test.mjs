@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGame, startTurn, skipSong, freeSkip, placeCard, addChallenge,
-  resolveTurn, awardBonus, nextTurn, isSlotCorrect,
+  resolveTurn, awardBonus, nextTurn, isSlotCorrect, pickHardIndex,
 } from '../js/engine.js';
 
 const card = (year, title = `song-${year}`) => ({ title, artist: 'artist', year });
@@ -69,6 +69,51 @@ test('isSlotCorrect counts same-year ties as correct on either side', () => {
   assert.equal(isSlotCorrect(tl, card(1990), 2), true);
   assert.equal(isSlotCorrect(tl, card(1990), 0), false);
   assert.equal(isSlotCorrect(tl, card(1990), 3), false);
+});
+
+// --- hard draws: nothing is ever an obvious pick ---
+
+test('pickHardIndex only picks years close to the timeline when close ones exist', () => {
+  const pile = [card(1950), card(1998), card(2003), card(1970)];
+  const tl = [card(2000)];
+  for (const r of [0, 0.3, 0.6, 0.99]) {
+    const idx = pickHardIndex(pile, tl, r);
+    assert.ok([1998, 2003].includes(pile[idx].year), `picked ${pile[idx].year}`);
+  }
+});
+
+test('pickHardIndex falls back to the least-obvious cards when nothing is close', () => {
+  const pile = [card(1925), card(1950), card(1960), card(1930)];
+  const tl = [card(2000)];
+  for (const r of [0, 0.5, 0.99]) {
+    const y = pile[pickHardIndex(pile, tl, r)].year;
+    assert.ok([1930, 1950, 1960].includes(y), `picked ${y}`); // 1925 is the most obvious
+  }
+});
+
+test('startTurn draws a non-obvious card when hardDraws is on (default)', () => {
+  const s = freshGame();
+  s.players[0].timeline = [card(2000)];
+  s.drawPile = [card(1950), card(1999), card(2004), card(1965)];
+  startTurn(s);
+  assert.ok([1999, 2004].includes(s.mystery.year), `drew ${s.mystery.year}`);
+  assert.equal(s.drawPile.length, 3);
+});
+
+test('skip redraws also avoid obvious picks under hardDraws', () => {
+  const s = freshGame();
+  s.players[0].timeline = [card(2000)];
+  s.drawPile = [card(1950), card(1999), card(2004), card(1965)];
+  startTurn(s);
+  skipSong(s);
+  assert.ok([1999, 2004].includes(s.mystery.year), `redrew ${s.mystery.year}`);
+});
+
+test('hardDraws off restores plain top-of-pile draws', () => {
+  const s = freshGame({ hardDraws: false });
+  const top = s.drawPile[s.drawPile.length - 1];
+  startTurn(s);
+  assert.equal(s.mystery, top);
 });
 
 // --- turn flow ---
