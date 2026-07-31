@@ -47,8 +47,12 @@ Same as real Hitster:
    editor shows it as excluded, with a Restore button), so decks improve
    every time you play. You can also 👍/👎 any song directly in the deck
    editor — handy when you forgot to vote during the game.
-8. First to the target number of cards wins. If the deck runs out first, most
-   cards wins (tokens break ties).
+8. First to the target number of cards wins. With **Endless deck** on (the
+   default), the pile never runs dry — when it gets low, the game discovers
+   new songs by the artists already in your deck (year taken from the song's
+   album, tagged "✨ new discovery" at reveal, and added to your deck so you
+   can vote on them). If endless is off or you're offline and the deck runs
+   out, most cards wins (tokens break ties).
 
 The game autosaves after every move — if the browser closes, **Resume game**
 on the home screen picks up where you left off.

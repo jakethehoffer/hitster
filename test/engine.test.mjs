@@ -40,6 +40,11 @@ test('createGame is deterministic for the same seed', () => {
   assert.deepEqual(a.drawPile.map(c => c.year), b.drawPile.map(c => c.year));
 });
 
+test('createGame stores the endless setting (default on)', () => {
+  assert.equal(freshGame().settings.endless, true);
+  assert.equal(freshGame({ endless: false }).settings.endless, false);
+});
+
 test('createGame rejects bad player counts and undersized decks', () => {
   assert.throws(() => createGame({ players: ['solo'], deck: makeDeck(20) }));
   assert.throws(() => createGame({ players: Array.from({ length: 9 }, (_, i) => `p${i}`), deck: makeDeck(30) }));

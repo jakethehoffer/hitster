@@ -50,6 +50,14 @@ scope — possible later on Cloudflare Durable Objects without changing the engi
   named the artist *and* title (honor system — tap their name).
 - **Win:** first player to reach the win target (default 10 cards, configurable
   5/10/15). If the deck runs out first, most cards wins; ties broken by tokens.
+- **Endless deck (added 2026-07-31, default on):** when the draw pile drops
+  below 6 cards, the app discovers up to 5 new songs by artists already in the
+  deck via Deezer artist search, filtering alternate cuts and compilation
+  albums, with the year taken from the song's album. Discoveries join the
+  bottom of the pile and the stored deck (so votes apply), and are tagged as
+  new discoveries at reveal. Deck-exhaustion rules remain the offline/opt-out
+  fallback. Deezer API error payloads (e.g. rate-limit quota) throw rather
+  than read as empty results, so a quota blip can never retire a real song.
 - Game state autosaves to localStorage; refresh resumes the game.
 
 ## Decks

@@ -31,11 +31,17 @@ export async function searchSongs(term, { limit = 12 } = {}) {
 // when the requested song doesn't is almost never what you want to hear
 // (learned the hard way: iTunes ranks "Espresso (On Vacation Version)" above
 // the real "Espresso").
-const BAD_MARKERS = [
+export const BAD_MARKERS = [
   'karaoke', 'instrumental', 'acapella', 'a cappella', 'tribute', 'cover',
   'remix', 'sped up', 'slowed', 'live', 'lullaby', '8-bit', 'version',
   'in the style of', 'originally performed', 'made famous',
 ];
+
+// True when a track title reads as an alternate cut rather than the original.
+export function looksLikeAltVersion(title) {
+  const t = title.toLowerCase();
+  return BAD_MARKERS.some((w) => t.includes(w));
+}
 
 export function scoreMatch(card, result) {
   const t = result.title.toLowerCase();

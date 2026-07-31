@@ -241,6 +241,34 @@ await step('unresolvable song is retired before anyone draws it', async () => {
   });
 });
 
+// Endless deck: a nearly-empty pile refills itself with real discoveries
+// from the deck's artists, and the stored deck grows with them.
+// (Runs inside the still-active second game.)
+await step('endless refill discovers new songs when the pile runs low', async () => {
+  const before = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('hitster.deck.t1')).songs.length);
+  const grew = await page.evaluate(async () => {
+    const g = window.__hitster.game;
+    if (!g || g.phase === 'gameover') return false;
+    g.settings.endless = true;
+    g.drawPile.length = 0; // force "running low"
+    g.drawPile.push({ title: 'Levitating', artist: 'Dua Lipa', year: 2020, previewUrl: 'data:audio/mp3;base64,AAAA' });
+    g.discard.length = 0; // keep the artist pool tight for determinism
+    // up to 3 attempts with a pause: earlier steps may have tripped
+    // Deezer's per-IP rate limit
+    for (let i = 0; i < 3 && g.drawPile.length <= 1; i++) {
+      await window.__hitster.refill();
+      if (g.drawPile.length <= 1) await new Promise((r) => setTimeout(r, 6000));
+    }
+    return g.drawPile.length > 1
+      && g.drawPile.some((c) => c.auto === true && Number.isInteger(c.year) && !!c.previewUrl);
+  });
+  const after = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('hitster.deck.t1')).songs.length);
+  if (!(after > before)) errors.push('refill did not grow the stored deck');
+  return grew;
+});
+
 await browser.close();
 server.close();
 

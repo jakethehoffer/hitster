@@ -27,6 +27,7 @@ export function createGame({
   cardsToWin = 10,
   startTokens = 2,
   challengesEnabled = true,
+  endless = true,
   rngSeed = 1,
 }) {
   if (!Array.isArray(players) || players.length < 2 || players.length > 8) {
@@ -53,7 +54,7 @@ export function createGame({
     challenges: [],
     outcome: null,
     winners: null,
-    settings: { cardsToWin, startTokens, challengesEnabled },
+    settings: { cardsToWin, startTokens, challengesEnabled, endless },
   };
 }
 

@@ -2,7 +2,8 @@ import {
   createGame, startTurn, skipSong, freeSkip, placeCard, addChallenge,
   resolveTurn, awardBonus, nextTurn,
 } from './engine.js';
-import { searchSongs, resolvePreview } from './itunes.js';
+import { searchSongs, resolvePreview, looksLikeAltVersion } from './itunes.js';
+import { artistTopTracks, albumYear, looksLikeCompilation } from './deezer.js';
 import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
   exportDeck, parseDeckImport, ensureSeedDecks,
@@ -485,9 +486,13 @@ function updateDeckWarning() {
   const comfy = players * target + 10;
   const pool = playableSongs(deck.songs);
   const excluded = deck.songs.length - pool.length;
+  const endless = $('#setup-endless').checked;
   const excludedNote = excluded
     ? ` (${excluded} disliked song${excluded > 1 ? 's' : ''} excluded — restore in the deck editor)` : '';
-  if (pool.length < comfy) {
+  if (pool.length < comfy && endless) {
+    warning.textContent = `This deck starts with ${pool.length} playable songs${excludedNote} — endless refill will top it up with new songs from its artists as you play.`;
+    warning.classList.remove('hidden');
+  } else if (pool.length < comfy) {
     warning.textContent = `This deck has ${pool.length} playable songs${excludedNote} — comfortable for these settings is ${comfy}+. You can still play; the game ends early if songs run out (most cards wins).`;
     warning.classList.remove('hidden');
   } else if (excluded) {
@@ -534,13 +539,14 @@ function beginGame(deck, players, settings) {
     cardsToWin: settings.target,
     startTokens: settings.tokens,
     challengesEnabled: settings.challenges,
+    endless: settings.endless,
     rngSeed: Math.floor(Math.random() * 2 ** 31),
   });
   gameDeckId = deck.id;
   showScreen('game');
   renderGame();
   saveGame();
-  prefetchUpcoming();
+  refillDeck().then(() => prefetchUpcoming());
 }
 
 function renderGame() {
@@ -668,8 +674,11 @@ function renderPhase() {
   }
 
   if (phase === 'reveal') {
-    const card = revealCardNode(lastRevealCard());
-    area.append(card);
+    const revealed = lastRevealCard();
+    area.append(revealCardNode(revealed));
+    if (revealed.auto) {
+      area.append(el('p', { class: 'phase-sub', text: '✨ New discovery — auto-added to this deck from its artists. Year comes from the song’s album; fix it in the deck editor if it looks off.' }));
+    }
     const o = game.outcome;
     if (o.activeCorrect) {
       area.append(el('p', { class: 'outcome good', text: `✔ ${activeName()} nailed it — card claimed!` }));
@@ -827,7 +836,8 @@ async function loadMysteryPreview() {
   }
   saveGame();
   renderGame();
-  prefetchUpcoming(); // warm the next songs while this one plays
+  // warm the next songs while this one plays, topping the pile up first
+  refillDeck().then(() => prefetchUpcoming());
 }
 
 // Resolve previews AHEAD of the draw so nobody ever faces an unavailable
@@ -874,6 +884,73 @@ async function prefetchUpcoming(count = 3) {
     }
   } finally {
     prefetching = false;
+  }
+}
+
+// Endless deck: when the pile runs low, discover new songs by artists already
+// in the deck (Deezer artist radar), take the year from the song's album, and
+// slide them into the bottom of the pile. Discoveries also join the stored
+// deck so votes work on them and the deck grows with every game.
+const REFILL_BELOW = 6;
+const REFILL_BATCH = 5;
+let refilling = false;
+
+async function refillDeck() {
+  if (!game || !game.settings.endless || refilling) return;
+  if (game.phase === 'gameover' || game.drawPile.length >= REFILL_BELOW) return;
+  refilling = true;
+  try {
+    const deck = getDeck(storage, gameDeckId);
+    const knownSongs = [
+      ...(deck ? deck.songs : []),
+      ...game.drawPile,
+      ...game.discard,
+      ...(game.mystery ? [game.mystery] : []),
+      ...game.players.flatMap((p) => p.timeline),
+    ];
+    const seen = new Set(knownSongs.map((s) => `${s.title.toLowerCase()}|${s.artist.toLowerCase()}`));
+    const artists = [...new Set(knownSongs.map((s) => s.artist))];
+    let added = 0;
+    // up to 6 distinct artists, in random order, until the batch is filled
+    const tryArtists = artists.slice().sort(() => Math.random() - 0.5).slice(0, 6);
+    for (const artist of tryArtists) {
+      if (!game || added >= REFILL_BATCH) break;
+      let candidates;
+      try {
+        candidates = await artistTopTracks(artist);
+      } catch { continue; }
+      for (const c of candidates) {
+        if (!game || added >= REFILL_BATCH) break;
+        const key = `${c.title.toLowerCase()}|${c.artist.toLowerCase()}`;
+        if (seen.has(key)) continue;
+        if (looksLikeAltVersion(c.title) || looksLikeCompilation(c.albumTitle)) continue;
+        let year;
+        try {
+          year = await albumYear(c.albumId);
+        } catch { continue; }
+        if (!year || year < 1950) continue;
+        const card = {
+          title: c.title, artist: c.artist, year,
+          previewUrl: c.previewUrl, artworkUrl: c.artworkUrl,
+          explicit: c.explicit, auto: true,
+        };
+        seen.add(key);
+        game.drawPile.unshift(card); // bottom of the pile
+        if (deck) {
+          deck.songs.push({ ...card });
+          saveDeck(storage, deck);
+        }
+        added += 1;
+      }
+    }
+    if (added && game) {
+      saveGame();
+      if (game.phase !== 'gameover') {
+        $('#draw-count').textContent = `${game.drawPile.length} songs left in the pile`;
+      }
+    }
+  } finally {
+    refilling = false;
   }
 }
 
@@ -956,7 +1033,7 @@ function onNextTurn() {
   if (game.phase === 'gameover') showWin();
   else {
     renderGame();
-    prefetchUpcoming();
+    refillDeck().then(() => prefetchUpcoming());
   }
 }
 
@@ -1012,7 +1089,7 @@ function resumeGame() {
       if (previewState === 'idle') loadMysteryPreview();
     }
     renderGame();
-    prefetchUpcoming();
+    refillDeck().then(() => prefetchUpcoming());
   } catch {
     toast('Saved game was unreadable — starting fresh.');
     storage.removeItem(SAVE_KEY);
@@ -1074,6 +1151,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btn-add-player').addEventListener('click', () => addPlayerRow());
   $('#setup-deck').addEventListener('change', updateDeckWarning);
   $('#setup-target').addEventListener('change', updateDeckWarning);
+  $('#setup-endless').addEventListener('change', updateDeckWarning);
 
   $('#btn-start-game').addEventListener('click', () => {
     const deck = getDeck(storage, $('#setup-deck').value);
@@ -1090,6 +1168,7 @@ document.addEventListener('DOMContentLoaded', () => {
       target: parseInt($('#setup-target').value, 10),
       tokens,
       challenges: $('#setup-challenges').checked,
+      endless: $('#setup-endless').checked,
     });
   });
 
@@ -1111,4 +1190,5 @@ document.addEventListener('DOMContentLoaded', () => {
 window.__hitster = {
   get game() { return game; },
   prefetch: (n) => prefetchUpcoming(n),
+  refill: () => refillDeck(),
 };

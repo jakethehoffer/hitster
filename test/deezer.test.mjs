@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { deezerTrackToCard } from '../js/deezer.js';
-import { pickBestMatch } from '../js/itunes.js';
+import { deezerTrackToCard, looksLikeCompilation } from '../js/deezer.js';
+import { pickBestMatch, looksLikeAltVersion } from '../js/itunes.js';
 
 test('deezerTrackToCard maps Deezer fields to the Card shape', () => {
   const card = deezerTrackToCard({
@@ -24,6 +24,17 @@ test('deezerTrackToCard leaves explicit undefined for clean tracks', () => {
   });
   assert.equal(card.explicit, undefined);
   assert.equal(card.artworkUrl, undefined);
+});
+
+test('refill filters reject alternate cuts and compilation albums', () => {
+  assert.equal(looksLikeAltVersion('HUMBLE. (Live at Coachella)'), true);
+  assert.equal(looksLikeAltVersion('Espresso (Sped Up)'), true);
+  assert.equal(looksLikeAltVersion('Espresso'), false);
+  assert.equal(looksLikeCompilation('Greatest Hits II'), true);
+  assert.equal(looksLikeCompilation('The Essential Michael Jackson'), true);
+  assert.equal(looksLikeCompilation('A Night at the Opera (2011 Remaster)'), true);
+  assert.equal(looksLikeCompilation('Future Nostalgia'), false);
+  assert.equal(looksLikeCompilation(''), false);
 });
 
 test('scored matching picks the explicit original from a realistic Deezer result set', () => {
