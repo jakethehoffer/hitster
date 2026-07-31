@@ -106,3 +106,10 @@ Created: 2026-07-28T21:24:34.3845104-04:00
 - tests run: npm test 48/48; smoke green incl. live refill assertion (Dua Lipa artist radar grows pile+stored deck with real years, quota-retry hardened); prod serving endless toggle + refill code
 - blockers: none
 - next steps: none pending
+
+### 2026-07-31T08:58:24.6759281-04:00 - claude - handoff
+- summary: Hard draws: engine scores pile cards by distance from the active player's timeline years and draws among close calls (<=7yr; closest 3 fallback) using a serializable PRNG (rngState in game state, survives save/resume). Setup toggle default on; off = plain pop. Endless refill now prefers in-era discoveries (span +/-10yr, one out-of-span spare as fallback) so hard candidates keep flowing. Deployed.
+- files changed: js/engine.js, js/app.js, index.html, test/engine.test.mjs, README.md, docs spec
+- tests run: npm test 53/53 (5 new hard-draw tests written failing-first incl. pool-widening bug caught red); smoke green end-to-end with hard draws on by default; prod serving setup-hard toggle + pickHardIndex
+- blockers: none
+- next steps: none pending
