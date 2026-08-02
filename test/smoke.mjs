@@ -41,7 +41,22 @@ const errors = [];
 const browser = await puppeteer.launch({ executablePath: EDGE, headless: 'new' });
 const page = await browser.newPage();
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+
+// iTunes and Deezer throttle a busy IP (403/429), which the app is built to
+// ride out — a failed lookup demotes or retires the card, it never breaks a
+// turn. Those are conditions of the network, not defects, so they are counted
+// and reported rather than failing the run. Anything else still fails it.
+const throttled = [];
+page.on('response', (r) => {
+  if (r.status() === 403 || r.status() === 429) throttled.push(r.url());
+});
+const isThrottleNoise = (text) =>
+  /Failed to load resource/.test(text) && /\b(403|429)\b/.test(text);
+page.on('console', (m) => {
+  if (m.type() !== 'error') return;
+  if (isThrottleNoise(m.text())) return;
+  errors.push(`console: ${m.text()}`);
+});
 
 // Silence real audio and confirm dialogs before any page script runs.
 await page.evaluateOnNewDocument(() => {
@@ -282,11 +297,11 @@ await step('unresolvable song is retired before anyone draws it', async () => {
     if (!g) return false;
     const bad = { title: 'zqxvbnq wertyzzq unfindable', artist: 'nonexistent band xyzzy', year: 1999 };
     g.drawPile.push(bad); // top of the pile = the very next draw
-    // prefetch() no-ops while an earlier run is still in flight, so pause
-    // between attempts instead of burning them all against the guard
-    for (let i = 0; i < 8 && g.drawPile.includes(bad); i++) {
+    // prefetch() coalesces rather than dropping a request, and retries cards
+    // demoted after a failed lookup, so awaiting it is enough. A couple of
+    // passes covers a transient failure being retried before it is retired.
+    for (let i = 0; i < 3 && g.drawPile.includes(bad); i++) {
       await window.__hitster.prefetch(1);
-      if (g.drawPile.includes(bad)) await new Promise((r) => setTimeout(r, 1500));
     }
     return !g.drawPile.includes(bad) && g.discard.includes(bad);
   });
@@ -323,6 +338,10 @@ await step('endless refill discovers new songs when the pile runs low', async ()
 await browser.close();
 server.close();
 
+if (throttled.length) {
+  const hosts = [...new Set(throttled.map((u) => new URL(u).host))].join(', ');
+  console.log(`\nnote: ${throttled.length} lookup(s) throttled by ${hosts} — the app rode them out`);
+}
 if (errors.length) {
   console.log('\nSMOKE FAILED:');
   for (const e of errors) console.log('  ' + e);

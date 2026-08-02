@@ -961,47 +961,75 @@ async function loadMysteryPreview() {
 // song: warm up the next few cards of the pile in the background. A card
 // whose lookup definitively finds nothing is quietly retired to the discard;
 // a transient failure demotes it to the bottom for another try later.
-let prefetching = false;
+let prefetchInFlight = null;
+let prefetchAgain = false;
 
-async function prefetchUpcoming(count = 3) {
-  if (!game || prefetching) return;
-  prefetching = true;
-  try {
-    // cards are drawn from the END of drawPile
-    const targets = game.drawPile.slice(-count).reverse();
-    for (const card of targets) {
-      if (!game || card.previewUrl || card === game.mystery) continue;
-      try {
-        const fresh = await resolvePreview(card);
-        if (!game) return;
-        card.previewUrl = fresh.previewUrl;
-        card.artworkUrl = card.artworkUrl || fresh.artworkUrl;
-        card.explicit = fresh.explicit;
-        cachePreviewToDeck(card);
-        warmReleaseDate(card);
-      } catch (err) {
-        if (!game) return;
-        const at = game.drawPile.indexOf(card);
-        if (at < 0) continue; // drawn while we were looking — in-turn handling owns it
-        card.prefetchFails = (card.prefetchFails || 0) + 1;
-        const definitiveMiss = /No preview found/.test(err.message);
-        if (definitiveMiss || card.prefetchFails >= 2) {
-          game.drawPile.splice(at, 1);
-          game.discard.push(card); // retired: the players never see it
-        } else {
-          game.drawPile.splice(at, 1);
-          game.drawPile.unshift(card); // bottom of the pile, retry later
-        }
+// Warming a request that arrives mid-run used to be dropped on the floor, so
+// cards added while a lookup was in progress stayed cold. Coalesce instead:
+// the caller gets a promise, and one more pass runs afterwards.
+function prefetchUpcoming(count = 3) {
+  if (!game) return Promise.resolve();
+  if (prefetchInFlight) {
+    prefetchAgain = true;
+    return prefetchInFlight;
+  }
+  prefetchInFlight = runPrefetch(count).finally(() => {
+    prefetchInFlight = null;
+    if (prefetchAgain) {
+      prefetchAgain = false;
+      prefetchUpcoming(count);
+    }
+  });
+  return prefetchInFlight;
+}
+
+// The cards worth a lookup, nearest the draw first. A card demoted after a
+// failed lookup goes to the BOTTOM of the pile, so a window over the top
+// alone left it stranded — never retried and never retired, which is exactly
+// the case the demotion exists to handle. Played cards are skipped: they can
+// never be drawn again, so a lookup for one is a wasted request.
+function prefetchTargets(count) {
+  const needsWork = (c) => !c.previewUrl && !(c.plays > 0) && c !== game.mystery;
+  const nearestFirst = game.drawPile.filter(needsWork).reverse();
+  const retries = nearestFirst.filter((c) => c.prefetchFails > 0);
+  const fresh = nearestFirst.filter((c) => !c.prefetchFails);
+  // Both halves are capped: when a provider is rate-limiting, every card fails
+  // transiently at once, and an unbounded retry list would answer that by
+  // making even more requests.
+  return [...fresh.slice(0, count), ...retries.slice(0, count)];
+}
+
+async function runPrefetch(count) {
+  for (const card of prefetchTargets(count)) {
+    if (!game || card.previewUrl || card === game.mystery) continue;
+    try {
+      const fresh = await resolvePreview(card);
+      if (!game) return;
+      card.previewUrl = fresh.previewUrl;
+      card.artworkUrl = card.artworkUrl || fresh.artworkUrl;
+      card.explicit = fresh.explicit;
+      cachePreviewToDeck(card);
+      warmReleaseDate(card);
+    } catch (err) {
+      if (!game) return;
+      const at = game.drawPile.indexOf(card);
+      if (at < 0) continue; // drawn while we were looking — in-turn handling owns it
+      card.prefetchFails = (card.prefetchFails || 0) + 1;
+      const definitiveMiss = /No preview found/.test(err.message);
+      if (definitiveMiss || card.prefetchFails >= 2) {
+        game.drawPile.splice(at, 1);
+        game.discard.push(card); // retired: the players never see it
+      } else {
+        game.drawPile.splice(at, 1);
+        game.drawPile.unshift(card); // bottom of the pile, retried by the next pass
       }
-      saveGame();
     }
-    // refresh only the pile counter — a full re-render could yank buttons
-    // out from under a mid-click player
-    if (game && game.phase !== 'gameover') {
-      $('#draw-count').textContent = `${drawableCount(game)} songs left in the pile`;
-    }
-  } finally {
-    prefetching = false;
+    saveGame();
+  }
+  // refresh only the pile counter — a full re-render could yank buttons
+  // out from under a mid-click player
+  if (game && game.phase !== 'gameover') {
+    $('#draw-count').textContent = `${drawableCount(game)} songs left in the pile`;
   }
 }
 
