@@ -26,10 +26,19 @@ test('deezerTrackToCard leaves explicit undefined for clean tracks', () => {
   assert.equal(card.artworkUrl, undefined);
 });
 
+test('deezerTrackToCard carries the popularity rank for tiebreaks', () => {
+  const card = deezerTrackToCard({
+    title: 'Hollaback Girl', artist: { name: 'Gwen Stefani' }, preview: 'p', rank: 529256,
+  });
+  assert.equal(card.rank, 529256);
+});
+
 test('refill filters reject alternate cuts and compilation albums', () => {
   assert.equal(looksLikeAltVersion('HUMBLE. (Live at Coachella)'), true);
   assert.equal(looksLikeAltVersion('Espresso (Sped Up)'), true);
   assert.equal(looksLikeAltVersion('Espresso'), false);
+  assert.equal(looksLikeAltVersion('Alive'), false, '"Alive" is not a live recording');
+  assert.equal(looksLikeAltVersion("Stayin' Alive"), false);
   assert.equal(looksLikeCompilation('Greatest Hits II'), true);
   assert.equal(looksLikeCompilation('The Essential Michael Jackson'), true);
   assert.equal(looksLikeCompilation('A Night at the Opera (2011 Remaster)'), true);

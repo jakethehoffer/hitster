@@ -98,6 +98,10 @@ await step('deck in select', () => page.$eval('#setup-deck', (s) => s.options.le
 // quick game: 5 cards to win, custom token count via the type-in field
 await page.select('#setup-target', '5');
 await page.evaluate(() => { document.querySelector('#setup-tokens').value = '4'; });
+// Endless refill grows the stored deck, and game length varies with the random
+// seed — so a long game would break the fixed deck-size checks further down.
+// Refill gets its own step later, on its own game.
+await page.evaluate(() => { document.querySelector('#setup-endless').checked = false; });
 await step('start game', async () => { await clickText('Start game'); return visible('#scoreboard'); });
 await step('custom token count applied', () => page.evaluate(() =>
   [...document.querySelectorAll('.player-chip .chip-tokens')].every((n) => n.textContent === '●'.repeat(4))));
@@ -109,6 +113,9 @@ while (turns < 80 && !won) {
   turns += 1;
   if (!(await clickText('▶ Draw a song'))) { errors.push(`turn ${turns}: no draw button`); break; }
   await page.waitForFunction(() => document.querySelector('.slot:not([disabled])'), { timeout: 5000 });
+  // The lock button is deliberately withheld while the preview is resolving,
+  // so wait for that to settle instead of racing however many lookups it takes.
+  await page.waitForFunction(() => window.__hitster.previewState !== 'loading', { timeout: 30000 });
   // spacebar toggles playback during a turn (must not crash or scroll away)
   if (turns === 1) await page.keyboard.press('Space');
   // rate the song BEFORE locking in (listening-phase vote row)
@@ -234,8 +241,11 @@ await step('unresolvable song is retired before anyone draws it', async () => {
     if (!g) return false;
     const bad = { title: 'zqxvbnq wertyzzq unfindable', artist: 'nonexistent band xyzzy', year: 1999 };
     g.drawPile.push(bad); // top of the pile = the very next draw
-    for (let i = 0; i < 5 && g.drawPile.includes(bad); i++) {
+    // prefetch() no-ops while an earlier run is still in flight, so pause
+    // between attempts instead of burning them all against the guard
+    for (let i = 0; i < 8 && g.drawPile.includes(bad); i++) {
       await window.__hitster.prefetch(1);
+      if (g.drawPile.includes(bad)) await new Promise((r) => setTimeout(r, 1500));
     }
     return !g.drawPile.includes(bad) && g.discard.includes(bad);
   });

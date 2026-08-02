@@ -10,6 +10,7 @@ export function deezerTrackToCard(track) {
     previewUrl: track.preview || undefined,
     artworkUrl: track.album && track.album.cover_medium ? track.album.cover_medium : undefined,
     explicit: track.explicit_lyrics ? true : undefined,
+    rank: typeof track.rank === 'number' ? track.rank : undefined,
   };
 }
 
@@ -30,6 +31,16 @@ export async function searchDeezer(term, { limit = 12 } = {}) {
   return data.data
     .filter((t) => t.preview && t.title && t.artist)
     .map(deezerTrackToCard);
+}
+
+// Field-scoped lookup. Free-text search ranks by relevance across the whole
+// catalogue and can drop the canonical recording entirely — "Hollaback Girl
+// Gwen Stefani" returns two remixes and a wall of karaoke, with the actual
+// single nowhere in the first 40 results. Scoping to the artist and track
+// fields puts the original first (verified 2026-08-01).
+export async function searchDeezerTrack(title, artist, { limit = 12 } = {}) {
+  const q = `artist:"${artist.replace(/"/g, '')}" track:"${title.replace(/"/g, '')}"`;
+  return searchDeezer(q, { limit });
 }
 
 // Popular tracks by an artist — the raw material for endless-deck refills.

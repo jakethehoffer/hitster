@@ -6,7 +6,7 @@ import { searchSongs, resolvePreview, looksLikeAltVersion } from './itunes.js';
 import { artistTopTracks, albumYear, looksLikeCompilation } from './deezer.js';
 import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
-  exportDeck, parseDeckImport, ensureSeedDecks,
+  exportDeck, parseDeckImport, ensureSeedDecks, refreshCachedPreviews,
   playableSongs, excludedCount, rateSong,
 } from './decks.js';
 
@@ -1118,8 +1118,26 @@ function resumeGame() {
 
 // ---------- wiring ----------
 
+// A saved game carries its own copies of the cards, so an era bump has to
+// reach into it too or a resumed game keeps playing the versions it cached.
+function clearSavedGamePreviews() {
+  const raw = storage.getItem(SAVE_KEY);
+  if (!raw) return;
+  try {
+    const saved = JSON.parse(raw);
+    const strip = (cards) => (cards || []).forEach((c) => { delete c.previewUrl; });
+    const g = saved.engine || {};
+    strip(g.drawPile);
+    strip(g.discard);
+    (g.players || []).forEach((p) => strip(p.timeline));
+    if (g.mystery) delete g.mystery.previewUrl;
+    storage.setItem(SAVE_KEY, JSON.stringify(saved));
+  } catch { /* unreadable save — resumeGame discards it anyway */ }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   ensureSeedDecks(storage);
+  if (refreshCachedPreviews(storage)) clearSavedGamePreviews();
 
   document.querySelectorAll('[data-nav]').forEach((b) =>
     b.addEventListener('click', () => showScreen(b.dataset.nav)));
@@ -1209,6 +1227,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Read-only-ish debug hook so the E2E smoke test can assert on real internals.
 window.__hitster = {
   get game() { return game; },
+  get previewState() { return previewState; },
   prefetch: (n) => prefetchUpcoming(n),
   refill: () => refillDeck(),
 };

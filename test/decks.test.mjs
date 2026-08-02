@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
-  exportDeck, parseDeckImport, ensureSeedDecks,
+  exportDeck, parseDeckImport, ensureSeedDecks, refreshCachedPreviews,
   playableSongs, excludedCount, rateSong,
 } from '../js/decks.js';
 import { SEED_DECKS } from '../js/seed-deck.js';
@@ -153,4 +153,31 @@ test('rateSong persists thumbs up/down to the stored deck', () => {
   // unknown song / deck are graceful no-ops
   assert.equal(rateSong(storage, deck.id, { title: 'Nope', artist: 'Nobody' }, 1), null);
   assert.equal(rateSong(storage, 'missing', { title: 'Song', artist: 'Artist' }, 1), null);
+});
+
+// A wrong-version preview stays wrong forever once cached, so a resolver
+// change has to invalidate it — without touching anything the user set.
+test('refreshCachedPreviews clears cached previews once, keeping user data', () => {
+  const storage = makeStorage();
+  const deck = createDeck(storage, 'Pop');
+  deck.songs = [
+    { title: 'Hollaback Girl', artist: 'Gwen Stefani', year: 2005, previewUrl: 'remix.mp3', rating: 2, artworkUrl: 'art.jpg' },
+    { title: 'SexyBack', artist: 'Justin Timberlake', year: 2006, previewUrl: 'dub.mp3', rating: -1 },
+  ];
+  saveDeck(storage, deck);
+
+  assert.equal(refreshCachedPreviews(storage), 2);
+  const after = getDeck(storage, deck.id);
+  assert.equal(after.songs[0].previewUrl, undefined);
+  assert.equal(after.songs[1].previewUrl, undefined);
+  assert.equal(after.songs[0].rating, 2, 'ratings survive');
+  assert.equal(after.songs[0].year, 2005, 'curated years survive');
+  assert.equal(after.songs[0].artworkUrl, 'art.jpg', 'artwork survives');
+
+  // Second run is a no-op: previews resolved since the bump must stick.
+  const fresh = getDeck(storage, deck.id);
+  fresh.songs[0].previewUrl = 'correct.mp3';
+  saveDeck(storage, fresh);
+  assert.equal(refreshCachedPreviews(storage), 0);
+  assert.equal(getDeck(storage, deck.id).songs[0].previewUrl, 'correct.mp3');
 });

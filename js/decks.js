@@ -6,6 +6,12 @@ const DECK_PREFIX = 'hitster.deck.';
 const LEGACY_SEED_FLAG = 'hitster.seedInstalled';
 const SEED_FLAG_PREFIX = 'hitster.seedInstalled.';
 const SEED_VERSION_PREFIX = 'hitster.seedVersion.';
+const PREVIEW_ERA_KEY = 'hitster.previewEra';
+
+// Bumped whenever the resolver's choice of recording changes. A preview URL is
+// derived data — whatever the picker settled on at the time — so a stale one
+// keeps playing a wrong version forever unless it is cleared.
+export const PREVIEW_ERA = 2;
 
 let idCounter = 0;
 function freshId() {
@@ -123,6 +129,28 @@ export function rateSong(storage, deckId, card, delta) {
   song.rating = (song.rating ?? 0) + delta;
   saveDeck(storage, deck);
   return song.rating;
+}
+
+// Drops cached preview URLs once per era bump so they re-resolve with the
+// current picker. Ratings, curated years, edits and deletions are untouched —
+// only the derived audio link goes. Returns how many were cleared.
+export function refreshCachedPreviews(storage) {
+  const era = parseInt(storage.getItem(PREVIEW_ERA_KEY) || '1', 10);
+  if (era >= PREVIEW_ERA) return 0;
+  let cleared = 0;
+  for (const deck of listDecks(storage)) {
+    let touched = false;
+    for (const song of deck.songs) {
+      if (song.previewUrl) {
+        delete song.previewUrl;
+        cleared += 1;
+        touched = true;
+      }
+    }
+    if (touched) saveDeck(storage, deck);
+  }
+  storage.setItem(PREVIEW_ERA_KEY, String(PREVIEW_ERA));
+  return cleared;
 }
 
 // ---------- built-in decks ----------

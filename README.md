@@ -88,11 +88,16 @@ They're normal decks — edit, prune with 👎 votes, or delete them. When an
 update adds songs to a built-in deck, your copy gets the new songs on next
 load with all your ratings and edits kept.
 
-If a preview plays the wrong version of a song (remix, acapella, live), fix it
-either way: search the song in the deck editor and click **↻ Use this preview**
-on the exact version you want, or hit **↻ Fix preview** on the song's row in
-the deck list below (it re-fetches with a matcher that prefers the original
-recording).
+Previews resolve to the original recording: the lookup asks Deezer by artist
+and track field (free-text search sometimes buries the real single under
+remixes and karaoke), scores results against alternate-cut markers and any
+qualifier the deck's title didn't ask for, and falls back to iTunes when the
+best Deezer has is a remix. A featured-artist credit or an "(Album Version)"
+label still counts as the original.
+
+If one still plays the wrong version, fix it either way: search the song in
+the deck editor and click **↻ Use this preview** on the exact version you
+want, or hit **↻ Fix preview** on the song's row in the deck list below.
 
 ## Development
 
