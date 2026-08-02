@@ -181,6 +181,15 @@ function renderHome() {
 
 // ---------- deck list ----------
 
+// A played song is retired, so the raw song count stops describing what a
+// deck can still deal — say how much of it is left to hear.
+function deckMeta(deck) {
+  const unheard = unplayedSongs(deck.songs).length;
+  return unheard === deck.songs.length
+    ? `${deck.songs.length} songs`
+    : `${unheard} unheard of ${deck.songs.length}`;
+}
+
 function renderDeckList() {
   const list = clear($('#deck-list'));
   const decks = listDecks(storage);
@@ -191,7 +200,7 @@ function renderDeckList() {
   for (const deck of decks) {
     list.append(el('li', { class: 'deck-item' },
       el('span', { class: 'deck-title', text: deck.name }),
-      el('span', { class: 'deck-meta', text: `${deck.songs.length} songs` }),
+      el('span', { class: 'deck-meta', text: deckMeta(deck) }),
       el('button', { class: 'btn', text: 'Edit', onclick: () => openDeckEdit(deck.id) }),
       el('button', { class: 'btn', text: 'Export', onclick: () => downloadDeck(deck) }),
       el('button', {
@@ -253,10 +262,14 @@ function renderDeckSongs() {
     .filter(({ song }) => !term
       || song.title.toLowerCase().includes(term)
       || song.artist.toLowerCase().includes(term));
+  const played = deck.songs.length - unplayedSongs(deck.songs).length;
   $('#deck-song-count').textContent = (term
     ? `${entries.length} of ${deck.songs.length} songs match`
     : `${deck.songs.length} songs in this deck`)
+    + (played ? ` — ${played} already played and retired` : '')
     + (excluded ? ` — ${excluded} excluded by 👎` : '');
+  // Only offer the reset when there is something to bring back.
+  $('#btn-reset-plays').classList.toggle('hidden', played === 0);
   const list = clear($('#deck-songs'));
   if (term && entries.length === 0) {
     list.append(el('li', { class: 'notice', text: 'No songs in this deck match — the box above searches iTunes to add new ones.' }));
@@ -317,6 +330,8 @@ function renderDeckSongs() {
       }),
       rating > 0 ? el('span', { class: 'rating-badge', text: `👍${rating}` }) : null,
       rating < 0 ? el('span', { class: 'rating-badge negative', text: '👎 excluded' }) : null,
+      // why a song stopped coming up
+      song.plays > 0 ? el('span', { class: 'played-badge', text: '✓ played' }) : null,
       rating < 0 ? el('button', {
         class: 'btn btn-small', text: 'Restore',
         onclick: () => {
@@ -1377,6 +1392,17 @@ document.addEventListener('DOMContentLoaded', () => {
     stopAudio();
   });
   $('#deck-filter').addEventListener('input', renderDeckSongs);
+
+  // Songs are never repeated, so a well-played deck needs a deliberate way
+  // back — not only the prompt that appears when a game can't start.
+  $('#btn-reset-plays').addEventListener('click', () => {
+    const deck = getDeck(storage, editingDeckId);
+    const played = deck.songs.length - unplayedSongs(deck.songs).length;
+    if (!confirm(`Bring back ${played} played song${played > 1 ? 's' : ''} in "${deck.name}"?\n\nOnly the play history clears — ratings, years and previews stay.`)) return;
+    const restored = resetPlays(storage, editingDeckId);
+    toast(`${restored} song${restored > 1 ? 's are' : ' is'} back in rotation`);
+    renderDeckSongs();
+  });
 
   $('#btn-add-player').addEventListener('click', () => addPlayerRow());
   $('#setup-deck').addEventListener('change', updateDeckWarning);

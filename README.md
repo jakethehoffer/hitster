@@ -61,11 +61,13 @@ Same as real Hitster:
 
 Songs are never repeated. Once a song has been revealed it is retired, and no
 later game deals it again — a deck plays through its songs and then stops.
-When too few unheard songs are left to start a game, the app offers to play
-the deck from the top again; declining leaves it alone. Starting over clears
-only the play history, never your ratings, years, previews or dates. With
-**Endless deck** on, discovery keeps adding genuinely new songs, so a deck
-usually grows faster than you can use it up.
+The deck list shows what's left ("12 unheard of 61"), the deck editor marks
+each retired song **✓ played**, and **↺ Start deck over** there puts them all
+back whenever you want. If a game can't start because too few unheard songs
+remain, the app offers the same reset; declining leaves the deck alone.
+Starting over clears only the play history, never your ratings, years,
+previews or dates. With **Endless deck** on, discovery keeps adding genuinely
+new songs, so a deck usually grows faster than you can use it up.
 
 Two songs from the same year are ordered by release date when both dates are
 known — the reveal card shows the day and month so you can see why. The date

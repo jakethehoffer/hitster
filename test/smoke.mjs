@@ -229,6 +229,14 @@ await step('to decks', async () => {
 });
 await step('edit deck', async () => { await clickText('Edit'); return visible('#song-search'); });
 await step('songs listed', () => page.$eval('#deck-songs', (n) => n.children.length === 24));
+// The game just retired a pile of songs; the editor has to say so and offer
+// the way back, or a deck quietly stops dealing with no explanation.
+await step('retired songs are visible with a way to bring them back', () => page.evaluate(() => {
+  const summary = document.querySelector('#deck-song-count').textContent;
+  const badges = document.querySelectorAll('.played-badge').length;
+  const resetOffered = !document.querySelector('#btn-reset-plays').classList.contains('hidden');
+  return /already played and retired/.test(summary) && badges > 0 && resetOffered;
+}));
 await step('year edit persists', async () => {
   await page.evaluate(() => {
     const input = document.querySelector('#deck-songs .year-input');

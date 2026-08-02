@@ -142,6 +142,7 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 .song-item .song-year { color: var(--gold); font-weight: 700; }
 .rating-badge { color: var(--ok); font-size: .85rem; font-weight: 700; white-space: nowrap; }
 .rating-badge.negative { color: var(--bad); }
+.played-badge { color: var(--ink-dim); font-size: .85rem; font-weight: 700; white-space: nowrap; }
 .explicit-badge { margin-left: .35rem; font-size: .85em; opacity: .75; }
 
 /* ---------- setup ---------- */
