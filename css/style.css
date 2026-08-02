@@ -254,9 +254,10 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 .slot:disabled { opacity: .35; cursor: default; }
 
 .game-footer {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
   color: var(--ink-dim); font-size: .9rem; margin-top: .6rem;
 }
+.game-footer #draw-count { margin-right: auto; }
 
 /* challenge list */
 .challenge-picker { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; margin: .8rem 0; }

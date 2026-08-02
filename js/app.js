@@ -11,6 +11,7 @@ import {
 } from './decks.js';
 
 const SAVE_KEY = 'hitster.savedGame';
+const SETUP_KEY = 'hitster.lastSetup';
 
 // ---------- tiny DOM helpers ----------
 
@@ -456,6 +457,24 @@ function addPlayerRow(name = '') {
   updateDeckWarning();
 }
 
+// The group outlives any one game. Names and settings are remembered so that
+// switching decks, starting over, or coming back after a reload never means
+// typing everyone in again.
+function saveSetup(deckId, players, settings) {
+  try {
+    storage.setItem(SETUP_KEY, JSON.stringify({ deckId, players, ...settings }));
+  } catch { /* storage full — the group just won't outlive this session */ }
+}
+
+function loadSetup() {
+  try {
+    const saved = JSON.parse(storage.getItem(SETUP_KEY));
+    return saved && Array.isArray(saved.players) && saved.players.length >= 2 ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
 function renderSetup() {
   const select = clear($('#setup-deck'));
   const decks = listDecks(storage);
@@ -464,12 +483,57 @@ function renderSetup() {
   }
   $('#btn-start-game').disabled = decks.length === 0;
   if (decks.length === 0) toast('Create a deck first');
+  // Only seed the form when it's empty — mid-session edits outrank what was
+  // saved, and a page reload is what needs the group put back.
   if ($('#player-inputs').children.length === 0) {
+    const last = loadSetup();
     playerCount = 0;
-    addPlayerRow();
-    addPlayerRow();
+    if (last) {
+      for (const name of last.players) addPlayerRow(name);
+      $('#setup-target').value = String(last.target);
+      $('#setup-tokens').value = String(last.tokens);
+      $('#setup-challenges').checked = last.challenges !== false;
+      $('#setup-endless').checked = last.endless !== false;
+      $('#setup-hard').checked = last.hardDraws !== false;
+    } else {
+      addPlayerRow();
+      addPlayerRow();
+    }
   }
+  // Land on the deck the group played last, when it's still around.
+  const last = loadSetup();
+  if (last && decks.some((d) => d.id === last.deckId)) select.value = last.deckId;
   updateDeckWarning();
+}
+
+// Everything Start game reads off the setup form.
+function currentSetupSettings() {
+  const rawTokens = parseInt($('#setup-tokens').value, 10);
+  const tokens = Number.isInteger(rawTokens) ? Math.min(20, Math.max(0, rawTokens)) : 2;
+  $('#setup-tokens').value = String(tokens);
+  return {
+    target: parseInt($('#setup-target').value, 10),
+    tokens,
+    challenges: $('#setup-challenges').checked,
+    endless: $('#setup-endless').checked,
+    hardDraws: $('#setup-hard').checked,
+  };
+}
+
+// Straight into another game with the group and settings already agreed —
+// used by "Play again" and by picking a different deck mid-game.
+function startWithSameGroup(deckId) {
+  const last = loadSetup();
+  const deck = getDeck(storage, deckId ?? (last && last.deckId));
+  if (!last || !deck) { showScreen('setup'); return; }
+  const { players, deckId: _ignored, ...settings } = last;
+  if (deck.songs.length < players.length + 1) {
+    toast(`"${deck.name}" needs at least ${players.length + 1} songs for ${players.length} players.`);
+    showScreen('setup');
+    return;
+  }
+  saveSetup(deck.id, players, settings);
+  beginGame(deck, players, settings);
 }
 
 function getSetupPlayers() {
@@ -1299,16 +1363,9 @@ document.addEventListener('DOMContentLoaded', () => {
       toast(`"${deck.name}" needs at least ${players.length + 1} songs for ${players.length} players.`);
       return;
     }
-    const rawTokens = parseInt($('#setup-tokens').value, 10);
-    const tokens = Number.isInteger(rawTokens) ? Math.min(20, Math.max(0, rawTokens)) : 2;
-    $('#setup-tokens').value = String(tokens);
-    beginGame(deck, players, {
-      target: parseInt($('#setup-target').value, 10),
-      tokens,
-      challenges: $('#setup-challenges').checked,
-      endless: $('#setup-endless').checked,
-      hardDraws: $('#setup-hard').checked,
-    });
+    const settings = currentSetupSettings();
+    saveSetup(deck.id, players, settings);
+    beginGame(deck, players, settings);
   });
 
   $('#btn-quit').addEventListener('click', () => {
@@ -1320,7 +1377,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  $('#btn-play-again').addEventListener('click', () => showScreen('setup'));
+  // Same group, same deck, straight back in — no setup detour.
+  $('#btn-play-again').addEventListener('click', () => startWithSameGroup());
+  $('#btn-win-change-deck').addEventListener('click', () => showScreen('setup'));
+
+  // Leave the deck mid-game and pick another one, keeping the group.
+  $('#btn-change-deck').addEventListener('click', () => {
+    if (!confirm('Leave this deck and pick another? This game ends; your group and settings are kept.')) return;
+    game = null;
+    storage.removeItem(SAVE_KEY);
+    stopAudio();
+    showScreen('setup');
+  });
 
   showScreen('home');
 });

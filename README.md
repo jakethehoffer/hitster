@@ -73,6 +73,13 @@ is only trusted when it agrees with the song's year (iTunes hands back album
 and compilation dates too), and when either song's date is unknown the game
 accepts both sides, exactly as it did before.
 
+The group is set up once. Player names, cards-to-win, tokens and the toggles
+are remembered, so **Play again** on the win screen drops you straight into
+another game with the same people and deck, **⇄ Change deck** (in the game
+footer, or on the win screen) leaves the current deck for another one without
+losing anyone, and reopening the app after a reload finds everybody still
+there.
+
 The game autosaves after every move — if the browser closes, **Resume game**
 on the home screen picks up where you left off.
 

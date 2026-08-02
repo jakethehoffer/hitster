@@ -177,7 +177,24 @@ console.log(`  game ended after ${turns} turns, win screen: ${won}`);
 if (!won) errors.push('never reached win screen');
 if (won) {
   await step('winner named', () => page.$eval('#win-title', (n) => n.textContent.includes('wins') || n.textContent.includes('tie')));
-  await step('play again -> setup', async () => { await clickText('Play again'); return visible('#btn-start-game'); });
+  // Play again keeps the group and the deck — straight back into a game, no
+  // setup detour and nobody re-typed.
+  await step('play again reuses the group without the setup screen', async () => {
+    const before = await page.evaluate(() => window.__hitster.game.players.map((p) => p.name).join(','));
+    await clickText('Play again');
+    return page.evaluate((names) => {
+      const inGame = !document.querySelector('[data-screen="game"]').classList.contains('hidden');
+      const g = window.__hitster.game;
+      return inGame && g && g.players.map((p) => p.name).join(',') === names;
+    }, before);
+  });
+  // ...and the mid-game escape hatch lands on setup with the group intact
+  await step('change deck keeps the group', async () => {
+    await page.evaluate(() => { document.querySelector('#btn-change-deck').click(); });
+    return page.evaluate(() =>
+      !document.querySelector('[data-screen="setup"]').classList.contains('hidden')
+      && [...document.querySelectorAll('#player-inputs input')].length >= 2);
+  });
 }
 
 // Every song revealed in that game must be counted in the stored deck — that
