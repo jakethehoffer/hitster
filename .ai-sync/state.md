@@ -113,3 +113,10 @@ Created: 2026-07-28T21:24:34.3845104-04:00
 - tests run: npm test 53/53 (5 new hard-draw tests written failing-first incl. pool-widening bug caught red); smoke green end-to-end with hard draws on by default; prod serving setup-hard toggle + pickHardIndex
 - blockers: none
 - next steps: none pending
+
+### 2026-08-01T22:20:58.7313048-04:00 - claude - handoff
+- summary: Wrong-version previews fixed: Deezer field-scoped lookup (free text buried the canonical single), alien-qualifier penalty for asides the deck title didn't ask for, weighted markers (karaoke/commentary 12 vs alt-cut 5, whole-word matched so Alive is not live), whole-act artist comparison (cover band 'Tonight i'm Taylor Swift' rejected, 'Ms. Lauryn Hill' still matches 'Lauryn Hill'), rank tiebreak, iTunes consulted when Deezer's best is only an alt cut. Preview era bump clears cached wrong URLs from decks + saved game. Deployed and prod-verified.
+- files changed: js/{itunes,deezer,decks,app}.js, test/{itunes,deezer,decks}.test.mjs, test/smoke.mjs, README.md
+- tests run: npm test 64/64 (13 new, written failing-first); npm run smoke green; live resolve of all 320 songs across 6 decks - 0 failures, remaining flags all correct recordings; in-browser puppeteer check of era bump + JSONP resolution; prod serving new code
+- blockers: none
+- next steps: Jake refreshes the page once: cached remixes are dropped and re-resolve to the originals on next play. Two findings not acted on: prefetchUpcoming() silently no-ops while a run is in flight (awaiting callers get nothing done); smoke game length is randomly seeded so deck-size assertions were flaky - main game now runs with endless off.
