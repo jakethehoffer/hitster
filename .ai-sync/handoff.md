@@ -105,3 +105,11 @@ Files changed: js/{itunes,deezer,decks,app}.js, test/{itunes,deezer,decks}.test.
 Tests run: npm test 64/64 (13 new, written failing-first); npm run smoke green; live resolve of all 320 songs across 6 decks - 0 failures, remaining flags all correct recordings; in-browser puppeteer check of era bump + JSONP resolution; prod serving new code
 Blockers: none
 Next steps: Jake refreshes the page once: cached remixes are dropped and re-resolve to the originals on next play. Two findings not acted on: prefetchUpcoming() silently no-ops while a run is in flight (awaiting callers get nothing done); smoke game length is randomly seeded so deck-size assertions were flaky - main game now runs with endless off.
+
+## 2026-08-01T23:26:14.3349523-04:00 - claude
+
+Summary: Song rotation across games: each deck song carries a plays count (incremented in resolveTurn, persisted via markPlayed); drawCard filters the pile to the least-played cards, then applies hard-draw scoring within that set. Preferring at draw time (not filtering the game pool) means the full deck stays in the pile, so rotation can never shorten a game, and it self-recycles once everything is level. Skipped songs are not counted (never revealed). Deployed and prod-verified.
+Files changed: js/engine.js, js/decks.js, js/app.js, test/engine.test.mjs, test/decks.test.mjs, test/smoke.mjs, README.md
+Tests run: npm test 71/71 (7 new, failing-first); smoke: all steps pass incl. new 'revealed songs counted against stored deck' step - console-error gate currently trips on iTunes 403s from IP rate-limiting, and the prior commit fails identically, so not a regression; 5-game UI-driven E2E asserted the least-played invariant at all 66 draws (games 1+2 zero overlap, wrap crossed in game 3, final spread 24 songs x2 / 6 songs x3)
+Blockers: iTunes (itunes.apple.com) is 403-ing this IP after heavy test traffic today; retry smoke later for a fully clean run
+Next steps: Optional follow-ups, not built: show play counts in the deck editor, and a 'reset rotation' control. Still open from earlier: prefetchUpcoming() silently no-ops while a run is in flight.
