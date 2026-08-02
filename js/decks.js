@@ -153,6 +153,20 @@ export function refreshCachedPreviews(storage) {
   return cleared;
 }
 
+// Records that a song was revealed in a game. The engine draws from the
+// least-played cards, so this is what stops the next game replaying the songs
+// you just heard. Best-effort like rateSong: null when the deck or song is
+// gone (deleted mid-game, playing an imported copy).
+export function markPlayed(storage, deckId, card) {
+  const deck = getDeck(storage, deckId);
+  if (!deck) return null;
+  const song = deck.songs.find((s) => s.title === card.title && s.artist === card.artist);
+  if (!song) return null;
+  song.plays = (song.plays ?? 0) + 1;
+  saveDeck(storage, deck);
+  return song.plays;
+}
+
 // ---------- built-in decks ----------
 
 // Installs each built-in deck on first ever run. Deleting one keeps it

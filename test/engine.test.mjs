@@ -402,3 +402,64 @@ test('deck exhaustion picks most cards, then most tokens, allowing co-winners', 
   nextTurn(t);
   assert.deepEqual(t.winners, [0, 1]); // full tie -> co-winners
 });
+
+// --- song rotation across games ---
+
+test('draws prefer songs nobody has heard yet', () => {
+  const s = freshGame({ hardDraws: false });
+  s.drawPile = [
+    { ...card(1970), plays: 2 },
+    { ...card(1980), plays: 0 },
+    { ...card(1990), plays: 1 },
+  ];
+  startTurn(s);
+  assert.equal(s.mystery.year, 1980, 'the unplayed song should come out first');
+});
+
+test('freshness outranks hard-draw closeness', () => {
+  const s = freshGame({ hardDraws: true });
+  s.players[s.current].timeline = [card(1985)];
+  s.drawPile = [
+    { ...card(1984), plays: 3 }, // closest, but everyone has heard it
+    { ...card(1950), plays: 0 },
+  ];
+  startTurn(s);
+  assert.equal(s.mystery.year, 1950);
+});
+
+test('hard draws still apply among equally fresh songs', () => {
+  const s = freshGame({ hardDraws: true });
+  s.players[s.current].timeline = [card(1985)];
+  s.drawPile = [card(1950), card(1984), card(2020)].map((c) => ({ ...c, plays: 1 }));
+  startTurn(s);
+  assert.equal(s.mystery.year, 1984, 'closest call among the equally-played');
+});
+
+test('songs come back around once every one has been played', () => {
+  const s = freshGame({ hardDraws: false });
+  s.drawPile = [
+    { ...card(1970), plays: 1 },
+    { ...card(1980), plays: 1 },
+  ];
+  startTurn(s);
+  assert.ok(s.mystery, 'an all-played pile still deals a card');
+  assert.equal(s.drawPile.length, 1);
+});
+
+test('resolveTurn counts the revealed song as played', () => {
+  const s = freshGame();
+  startTurn(s);
+  const revealed = s.mystery;
+  assert.equal(revealed.plays ?? 0, 0);
+  placeCard(s, 0);
+  resolveTurn(s);
+  assert.equal(revealed.plays, 1);
+});
+
+test('a skipped song is not counted as played', () => {
+  const s = freshGame();
+  startTurn(s);
+  const skipped = s.mystery;
+  skipSong(s);
+  assert.equal(skipped.plays ?? 0, 0, 'never revealed, so it stays fresh');
+});

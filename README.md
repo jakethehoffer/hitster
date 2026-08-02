@@ -57,6 +57,12 @@ Same as real Hitster:
    can vote on them). If endless is off or you're offline and the deck runs
    out, most cards wins (tokens break ties).
 
+Songs don't repeat between games. Each deck remembers how many times a song
+has been revealed, and draws come from the least-played cards, so a new game
+works through the songs you haven't heard before returning to any of them.
+Once a deck has been played through, everything is level again and the
+rotation starts over.
+
 The game autosaves after every move — if the browser closes, **Resume game**
 on the home screen picks up where you left off.
 

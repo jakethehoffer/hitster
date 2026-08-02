@@ -75,10 +75,11 @@ function nextRand(state) {
 // distance from the nearest year in the player's timeline; the draw comes
 // randomly from the close-call pool (within hardWindow years), or from the
 // few least-obvious cards available when nothing is that close.
-export function pickHardIndex(drawPile, timeline, rand, { hardWindow = 7, poolMin = 3 } = {}) {
+export function pickHardIndex(drawPile, timeline, rand, { hardWindow = 7, poolMin = 3, indices = null } = {}) {
   const years = timeline.map((c) => c.year);
-  const scored = drawPile
-    .map((c, i) => ({ i, d: Math.min(...years.map((t) => Math.abs(c.year - t))) }))
+  const from = indices || drawPile.map((_, i) => i);
+  const scored = from
+    .map((i) => ({ i, d: Math.min(...years.map((t) => Math.abs(drawPile[i].year - t))) }))
     .sort((a, b) => a.d - b.d);
   let pool = scored.filter((s) => s.d <= hardWindow);
   if (pool.length === 0) {
@@ -88,16 +89,31 @@ export function pickHardIndex(drawPile, timeline, rand, { hardWindow = 7, poolMi
   return pool[Math.floor(rand * pool.length)].i;
 }
 
+// A deck outlives the game it was shuffled for, so cards carry how many times
+// they've been revealed. Draws come from the least-played cards in the pile,
+// which works the deck through its unheard songs before repeating any — and
+// once everything has been heard, the whole pile is level again and normal
+// play resumes.
+function freshestIndices(drawPile) {
+  const plays = drawPile.map((c) => c.plays || 0);
+  const fewest = Math.min(...plays);
+  return plays.reduce((acc, n, i) => (n === fewest ? (acc.push(i), acc) : acc), []);
+}
+
 function drawCard(state) {
+  const fresh = freshestIndices(state.drawPile);
   if (state.settings.hardDraws) {
     const idx = pickHardIndex(
       state.drawPile,
       state.players[state.current].timeline,
       nextRand(state),
+      { indices: fresh },
     );
     return state.drawPile.splice(idx, 1)[0];
   }
-  return state.drawPile.pop();
+  // Still a top-of-pile draw — the shuffle supplies the randomness — but
+  // reaching past cards the group has already heard.
+  return state.drawPile.splice(fresh[fresh.length - 1], 1)[0];
 }
 
 function requirePhase(state, phase) {
@@ -184,6 +200,7 @@ export function resolveTurn(state) {
   const card = state.mystery;
   // Judge everything against the timeline BEFORE the card is inserted —
   // insertion shifts slot indices.
+  card.plays = (card.plays || 0) + 1; // heard and answered: don't lead with it next game
   const activeCorrect = isSlotCorrect(active.timeline, card, state.placedSlot);
   const judged = state.challenges.map((c) => ({
     ...c,

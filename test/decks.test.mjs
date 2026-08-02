@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
-  exportDeck, parseDeckImport, ensureSeedDecks, refreshCachedPreviews,
+  exportDeck, parseDeckImport, ensureSeedDecks, refreshCachedPreviews, markPlayed,
   playableSongs, excludedCount, rateSong,
 } from '../js/decks.js';
 import { SEED_DECKS } from '../js/seed-deck.js';
@@ -180,4 +180,21 @@ test('refreshCachedPreviews clears cached previews once, keeping user data', () 
   saveDeck(storage, fresh);
   assert.equal(refreshCachedPreviews(storage), 0);
   assert.equal(getDeck(storage, deck.id).songs[0].previewUrl, 'correct.mp3');
+});
+
+// Rotation only works if the count outlives the game it was earned in.
+test('markPlayed increments the stored song play count', () => {
+  const storage = makeStorage();
+  const deck = createDeck(storage, 'Rotation');
+  deck.songs.push({ title: 'Song', artist: 'Artist', year: 2010, rating: 1 });
+  saveDeck(storage, deck);
+
+  assert.equal(markPlayed(storage, deck.id, { title: 'Song', artist: 'Artist' }), 1);
+  assert.equal(markPlayed(storage, deck.id, { title: 'Song', artist: 'Artist' }), 2);
+  const stored = getDeck(storage, deck.id).songs[0];
+  assert.equal(stored.plays, 2);
+  assert.equal(stored.rating, 1, 'ratings are untouched');
+  // unknown song / deck are graceful no-ops, like rateSong
+  assert.equal(markPlayed(storage, deck.id, { title: 'Nope', artist: 'Nobody' }), null);
+  assert.equal(markPlayed(storage, 'missing', { title: 'Song', artist: 'Artist' }), null);
 });

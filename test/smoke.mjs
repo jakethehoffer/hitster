@@ -164,6 +164,14 @@ if (won) {
   await step('play again -> setup', async () => { await clickText('Play again'); return visible('#btn-start-game'); });
 }
 
+// Every song revealed in that game must be counted in the stored deck — that
+// count is what keeps the next game off the songs we just heard.
+await step('revealed songs are counted against the stored deck', () => page.evaluate((played) => {
+  const songs = JSON.parse(localStorage.getItem('hitster.deck.t1')).songs;
+  const counted = songs.filter((s) => (s.plays ?? 0) > 0).length;
+  return counted >= played && songs.every((s) => (s.plays ?? 0) <= 1);
+}, turns));
+
 // deck editor round trip against the REAL app flow (no iTunes call: manual-ish)
 console.log('smoke: deck editor');
 await step('to decks', async () => {

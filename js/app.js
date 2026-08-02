@@ -7,7 +7,7 @@ import { artistTopTracks, albumYear, looksLikeCompilation } from './deezer.js';
 import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
   exportDeck, parseDeckImport, ensureSeedDecks, refreshCachedPreviews,
-  playableSongs, excludedCount, rateSong,
+  playableSongs, excludedCount, rateSong, markPlayed,
 } from './decks.js';
 
 const SAVE_KEY = 'hitster.savedGame';
@@ -1033,15 +1033,23 @@ function onLockPlacement() {
     && game.players.some((p, i) => i !== game.current && p.tokens > 0);
   if (!anyChallenger) {
     stopAudio();
-    resolveTurn(game);
+    revealMystery();
   }
   saveGame();
   renderGame();
 }
 
+// The engine counts the reveal on the in-game card; the stored deck needs it
+// too, or the rotation resets every time a game starts.
+function revealMystery() {
+  const card = game.mystery;
+  resolveTurn(game);
+  if (gameDeckId && card) markPlayed(storage, gameDeckId, card);
+}
+
 function onReveal() {
   stopAudio();
-  resolveTurn(game);
+  revealMystery();
   saveGame();
   renderGame();
 }
