@@ -2,7 +2,7 @@ import {
   createGame, startTurn, skipSong, freeSkip, placeCard, addChallenge,
   resolveTurn, awardBonus, nextTurn,
 } from './engine.js';
-import { searchSongs, resolvePreview, looksLikeAltVersion } from './itunes.js';
+import { searchSongs, resolvePreview, resolveReleaseDate, looksLikeAltVersion } from './itunes.js';
 import { artistTopTracks, albumYear, looksLikeCompilation } from './deezer.js';
 import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
@@ -547,6 +547,7 @@ function beginGame(deck, players, settings) {
   showScreen('game');
   renderGame();
   saveGame();
+  warmTimelineDates();
   refillDeck().then(() => prefetchUpcoming());
 }
 
@@ -743,10 +744,24 @@ function lastRevealCard() {
   return game.discard[game.discard.length - 1];
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// "2015-10-23" -> "23 Oct". Split by hand: `new Date` would shift the day
+// backwards for anyone west of UTC.
+function dayAndMonth(released) {
+  const [, m, d] = (released || '').split('-');
+  const month = MONTHS[parseInt(m, 10) - 1];
+  return month ? `${parseInt(d, 10)} ${month}` : null;
+}
+
 function revealCardNode(card) {
+  // The date is what decides a placement against a song from the same year,
+  // so show it — otherwise losing one of those looks arbitrary.
+  const day = card.released ? dayAndMonth(card.released) : null;
   return el('div', { class: 'reveal-card' },
     card.artworkUrl ? el('img', { src: card.artworkUrl, alt: '' }) : null,
     el('div', { class: 'reveal-year', text: String(card.year) }),
+    day ? el('div', { class: 'reveal-date', text: day }) : null,
     el('div', { class: 'reveal-title', text: card.title }),
     el('div', { class: 'reveal-artist', text: card.artist }));
 }
@@ -837,6 +852,10 @@ async function loadMysteryPreview() {
   }
   saveGame();
   renderGame();
+  // the mystery and the cards it will be judged against need dates to
+  // separate same-year placements
+  warmReleaseDate(game.mystery);
+  warmTimelineDates();
   // warm the next songs while this one plays, topping the pile up first
   refillDeck().then(() => prefetchUpcoming());
 }
@@ -862,6 +881,7 @@ async function prefetchUpcoming(count = 3) {
         card.artworkUrl = card.artworkUrl || fresh.artworkUrl;
         card.explicit = fresh.explicit;
         cachePreviewToDeck(card);
+        warmReleaseDate(card);
       } catch (err) {
         if (!game) return;
         const at = game.drawPile.indexOf(card);
@@ -986,6 +1006,46 @@ function cachePreviewToDeck(card) {
     song.explicit = card.explicit;
     saveDeck(storage, deck);
   }
+}
+
+// Release dates separate songs that share a year. One lookup per song ever:
+// the answer (including "no date worth trusting") is cached on the deck.
+// Never awaited by the turn — a missing date just leaves the placement free.
+const dateLookups = new Set();
+
+function warmReleaseDate(card) {
+  if (!card || card.released !== undefined) return;
+  const key = `${card.title}|${card.artist}`;
+  if (dateLookups.has(key)) return;
+  // The deck may already know: a resumed game carries its own copies of the
+  // cards, and iTunes rate-limits, so never pay for an answer twice.
+  const deck = gameDeckId ? getDeck(storage, gameDeckId) : null;
+  const known = deck && deck.songs.find((s) => s.title === card.title && s.artist === card.artist);
+  if (known && known.released !== undefined) {
+    card.released = known.released;
+    saveGame();
+    return;
+  }
+  dateLookups.add(key);
+  resolveReleaseDate(card)
+    .then((released) => {
+      // null is a real answer: store it so we don't ask again every game
+      card.released = released;
+      saveGame();
+      const d = gameDeckId ? getDeck(storage, gameDeckId) : null;
+      const song = d && d.songs.find((s) => s.title === card.title && s.artist === card.artist);
+      if (!song) return;
+      song.released = released;
+      saveDeck(storage, d);
+    })
+    .catch(() => { dateLookups.delete(key); /* transient — try again later */ });
+}
+
+// The cards a placement will be judged against: the active player's timeline
+// (dealt at game start, so never warmed by the draw) plus the mystery.
+function warmTimelineDates() {
+  if (!game) return;
+  for (const p of game.players) p.timeline.forEach(warmReleaseDate);
 }
 
 function onStartTurn() {

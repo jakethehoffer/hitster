@@ -122,15 +122,26 @@ function requirePhase(state, phase) {
   }
 }
 
+// Ordering is by year, and within a year by release date when both cards
+// carry one. A missing date can't be judged, so those pairs stay a tie and
+// either side counts — the same rule the game had before dates existed.
+// Returns -1, 0 or 1 for "a before b", "can't separate them", "a after b".
+export function compareCards(a, b) {
+  if (a.year !== b.year) return a.year < b.year ? -1 : 1;
+  if (!a.released || !b.released) return 0;
+  if (a.released === b.released) return 0;
+  return a.released < b.released ? -1 : 1;
+}
+
 export function isSlotCorrect(timeline, card, slot) {
-  const leftOk = slot === 0 || timeline[slot - 1].year <= card.year;
-  const rightOk = slot === timeline.length || card.year <= timeline[slot].year;
+  const leftOk = slot === 0 || compareCards(timeline[slot - 1], card) <= 0;
+  const rightOk = slot === timeline.length || compareCards(card, timeline[slot]) <= 0;
   return leftOk && rightOk;
 }
 
 export function insertIntoTimeline(timeline, card) {
   let i = 0;
-  while (i < timeline.length && timeline[i].year <= card.year) i++;
+  while (i < timeline.length && compareCards(timeline[i], card) <= 0) i++;
   timeline.splice(i, 0, card);
 }
 

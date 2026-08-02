@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreMatch, pickBestMatch } from '../js/itunes.js';
+import { scoreMatch, pickBestMatch, pickReleaseDate } from '../js/itunes.js';
 
 const want = { title: 'Espresso', artist: 'Sabrina Carpenter', year: 2024 };
 
@@ -270,4 +270,23 @@ test('pickBestMatch returns null when nothing plausible matches', () => {
     { title: 'Completely Different Song', artist: 'Nobody' },
   ]), null);
   assert.equal(pickBestMatch(want, []), null);
+});
+
+// --- release dates, used to order songs sharing a year ---
+
+test('a release date is taken only when it agrees with the deck year', () => {
+  const card = { title: 'Hello', artist: 'Adele', year: 2015 };
+  // the single's own date, on the right year: usable
+  assert.equal(pickReleaseDate(card, [
+    { title: 'Hello', artist: 'Adele', year: 2015, released: '2015-10-23' },
+  ]), '2015-10-23');
+  // a compilation reissue carries the wrong year — the curated year wins and
+  // we simply don't learn a date
+  assert.equal(pickReleaseDate(card, [
+    { title: 'Hello', artist: 'Adele', year: 2021, released: '2021-06-04' },
+  ]), null);
+  assert.equal(pickReleaseDate(card, []), null);
+  assert.equal(pickReleaseDate(card, [
+    { title: 'Something Else', artist: 'Adele', year: 2015, released: '2015-10-23' },
+  ]), null, 'and never from a different song');
 });

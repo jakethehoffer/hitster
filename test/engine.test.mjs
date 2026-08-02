@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGame, startTurn, skipSong, freeSkip, placeCard, addChallenge,
-  resolveTurn, awardBonus, nextTurn, isSlotCorrect, pickHardIndex,
+  resolveTurn, awardBonus, nextTurn, isSlotCorrect, pickHardIndex, insertIntoTimeline,
 } from '../js/engine.js';
 
 const card = (year, title = `song-${year}`) => ({ title, artist: 'artist', year });
@@ -462,4 +462,49 @@ test('a skipped song is not counted as played', () => {
   const skipped = s.mystery;
   skipSong(s);
   assert.equal(skipped.plays ?? 0, 0, 'never revealed, so it stays fresh');
+});
+
+// --- same-year ordering ---
+
+const dated = (year, released, title = `song-${released}`) =>
+  ({ title, artist: 'artist', year, released });
+
+test('a same-year card must land on the correct side when both dates are known', () => {
+  const timeline = [dated(2015, '2015-11-20', 'Hello')];
+  const earlier = dated(2015, '2015-03-01', 'Uptown');
+  const later = dated(2015, '2015-12-24', 'Sorry');
+  assert.equal(isSlotCorrect(timeline, earlier, 0), true, 'March goes before November');
+  assert.equal(isSlotCorrect(timeline, earlier, 1), false);
+  assert.equal(isSlotCorrect(timeline, later, 1), true, 'December goes after November');
+  assert.equal(isSlotCorrect(timeline, later, 0), false);
+});
+
+test('without a date on either card, any same-year slot still counts', () => {
+  const timeline = [card(2015, 'known')];
+  const undatedCard = card(2015, 'mystery');
+  assert.equal(isSlotCorrect(timeline, undatedCard, 0), true);
+  assert.equal(isSlotCorrect(timeline, undatedCard, 1), true);
+  // one side dated and the other not is still a coin flip, so allow both
+  const half = [dated(2015, '2015-06-01', 'dated')];
+  assert.equal(isSlotCorrect(half, undatedCard, 0), true);
+  assert.equal(isSlotCorrect(half, undatedCard, 1), true);
+});
+
+test('identical release dates accept either side', () => {
+  const timeline = [dated(2015, '2015-06-01', 'a')];
+  const same = dated(2015, '2015-06-01', 'b');
+  assert.equal(isSlotCorrect(timeline, same, 0), true);
+  assert.equal(isSlotCorrect(timeline, same, 1), true);
+});
+
+test('different years ignore dates entirely', () => {
+  const timeline = [dated(2015, '2015-11-20'), dated(2017, '2017-01-05')];
+  assert.equal(isSlotCorrect(timeline, dated(2016, '2016-07-07'), 1), true);
+  assert.equal(isSlotCorrect(timeline, dated(2016, '2016-07-07'), 0), false);
+});
+
+test('a stolen card is inserted in date order within its year', () => {
+  const timeline = [dated(2015, '2015-01-01', 'jan'), dated(2015, '2015-12-01', 'dec')];
+  insertIntoTimeline(timeline, dated(2015, '2015-06-01', 'jun'));
+  assert.deepEqual(timeline.map((c) => c.title), ['jan', 'jun', 'dec']);
 });

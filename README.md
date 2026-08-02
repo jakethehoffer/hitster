@@ -63,6 +63,12 @@ works through the songs you haven't heard before returning to any of them.
 Once a deck has been played through, everything is level again and the
 rotation starts over.
 
+Two songs from the same year are ordered by release date when both dates are
+known — the reveal card shows the day and month so you can see why. The date
+is only trusted when it agrees with the song's year (iTunes hands back album
+and compilation dates too), and when either song's date is unknown the game
+accepts both sides, exactly as it did before.
+
 The game autosaves after every move — if the browser closes, **Resume game**
 on the home screen picks up where you left off.
 

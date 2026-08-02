@@ -206,6 +206,7 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 @keyframes flipIn { from { transform: rotateY(90deg); opacity: 0; } to { transform: none; opacity: 1; } }
 .reveal-card img { width: 140px; height: 140px; border-radius: 10px; }
 .reveal-card .reveal-year { font-size: 3rem; font-weight: 900; color: var(--gold); line-height: 1; }
+.reveal-card .reveal-date { font-size: .85rem; font-weight: 700; color: var(--ink-dim); letter-spacing: .04em; }
 .reveal-card .reveal-title { font-size: 1.3rem; font-weight: 700; }
 .reveal-card .reveal-artist { color: var(--ink-dim); }
 

@@ -14,6 +14,7 @@ function toCard(result) {
       ? result.artworkUrl100.replace('100x100', '300x300')
       : undefined,
     explicit: result.trackExplicitness === 'explicit' ? true : undefined,
+    released: result.releaseDate ? result.releaseDate.slice(0, 10) : undefined,
   };
 }
 
@@ -207,6 +208,23 @@ export function pickBestMatch(card, results) {
     if (!best || betterThan(card, r, best)) best = r;
   }
   return best;
+}
+
+// The release date that orders songs sharing a year. Taken only when the
+// matched result agrees with the deck's curated year — iTunes hands back
+// compilation and remaster dates, and the curated year is the authority.
+export function pickReleaseDate(card, results) {
+  const match = pickBestMatch(card, results);
+  if (!match || !match.released) return null;
+  if (match.year !== card.year) return null;
+  return match.released;
+}
+
+// One lookup per song, cached on the deck afterwards. Null means "no date
+// worth trusting", which leaves same-year placements a free choice.
+export async function resolveReleaseDate(card) {
+  const results = await searchSongs(`${card.title} ${card.artist}`, { limit: 12 });
+  return pickReleaseDate(card, results);
 }
 
 function withPreview(card, match) {
