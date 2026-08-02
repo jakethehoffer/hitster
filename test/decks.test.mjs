@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
   exportDeck, parseDeckImport, ensureSeedDecks, refreshCachedPreviews, markPlayed,
-  playableSongs, excludedCount, rateSong,
+  playableSongs, excludedCount, rateSong, unplayedSongs, resetPlays,
 } from '../js/decks.js';
 import { SEED_DECKS } from '../js/seed-deck.js';
 
@@ -197,4 +197,33 @@ test('markPlayed increments the stored song play count', () => {
   // unknown song / deck are graceful no-ops, like rateSong
   assert.equal(markPlayed(storage, deck.id, { title: 'Nope', artist: 'Nobody' }), null);
   assert.equal(markPlayed(storage, 'missing', { title: 'Song', artist: 'Artist' }), null);
+});
+
+// Songs are never recycled, so a new game is built only from what nobody has
+// heard — and a used-up deck needs a way back.
+test('unplayedSongs keeps only songs nobody has heard', () => {
+  const songs = [
+    { title: 'A', artist: 'x', year: 2000 },
+    { title: 'B', artist: 'x', year: 2001, plays: 0 },
+    { title: 'C', artist: 'x', year: 2002, plays: 1 },
+    { title: 'D', artist: 'x', year: 2003, plays: 4 },
+  ];
+  assert.deepEqual(unplayedSongs(songs).map((s) => s.title), ['A', 'B']);
+});
+
+test('resetPlays clears the history without touching anything else', () => {
+  const storage = makeStorage();
+  const deck = createDeck(storage, 'Used up');
+  deck.songs = [
+    { title: 'A', artist: 'x', year: 2000, plays: 3, rating: 2, previewUrl: 'p', released: '2000-05-01' },
+    { title: 'B', artist: 'x', year: 2001, plays: 1 },
+  ];
+  saveDeck(storage, deck);
+  assert.equal(resetPlays(storage, deck.id), 2, 'reports how many songs came back');
+  const after = getDeck(storage, deck.id);
+  assert.equal(unplayedSongs(after.songs).length, 2);
+  assert.equal(after.songs[0].rating, 2, 'ratings survive');
+  assert.equal(after.songs[0].previewUrl, 'p', 'previews survive');
+  assert.equal(after.songs[0].released, '2000-05-01', 'dates survive');
+  assert.equal(resetPlays(storage, 'missing'), null);
 });

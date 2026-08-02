@@ -1,13 +1,13 @@
 import {
   createGame, startTurn, skipSong, freeSkip, placeCard, addChallenge,
-  resolveTurn, awardBonus, nextTurn,
+  resolveTurn, awardBonus, nextTurn, drawableCount,
 } from './engine.js';
 import { searchSongs, resolvePreview, resolveReleaseDate, looksLikeAltVersion } from './itunes.js';
 import { artistTopTracks, albumYear, looksLikeCompilation } from './deezer.js';
 import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
   exportDeck, parseDeckImport, ensureSeedDecks, refreshCachedPreviews,
-  playableSongs, excludedCount, rateSong, markPlayed,
+  playableSongs, excludedCount, rateSong, markPlayed, unplayedSongs, resetPlays,
 } from './decks.js';
 
 const SAVE_KEY = 'hitster.savedGame';
@@ -484,19 +484,26 @@ function updateDeckWarning() {
   const players = $('#player-inputs').children.length;
   const target = parseInt($('#setup-target').value, 10);
   const comfy = players * target + 10;
-  const pool = playableSongs(deck.songs);
-  const excluded = deck.songs.length - pool.length;
+  const playable = playableSongs(deck.songs);
+  const excluded = deck.songs.length - playable.length;
+  // Songs are never repeated, so what matters is how many are still unheard.
+  const pool = unplayedSongs(playable);
+  const heard = playable.length - pool.length;
   const endless = $('#setup-endless').checked;
   const excludedNote = excluded
     ? ` (${excluded} disliked song${excluded > 1 ? 's' : ''} excluded — restore in the deck editor)` : '';
-  if (pool.length < comfy && endless) {
-    warning.textContent = `This deck starts with ${pool.length} playable songs${excludedNote} — endless refill will top it up with new songs from its artists as you play.`;
+  const heardNote = heard ? ` ${heard} already played and retired.` : '';
+  if (pool.length < players + 1) {
+    warning.textContent = `Only ${pool.length} unheard songs left${excludedNote}.${heardNote} Starting a game will offer to play the deck from the top again.`;
+    warning.classList.remove('hidden');
+  } else if (pool.length < comfy && endless) {
+    warning.textContent = `${pool.length} unheard songs${excludedNote}.${heardNote} Endless refill will top it up with new songs from its artists as you play.`;
     warning.classList.remove('hidden');
   } else if (pool.length < comfy) {
-    warning.textContent = `This deck has ${pool.length} playable songs${excludedNote} — comfortable for these settings is ${comfy}+. You can still play; the game ends early if songs run out (most cards wins).`;
+    warning.textContent = `${pool.length} unheard songs${excludedNote}.${heardNote} Comfortable for these settings is ${comfy}+. You can still play; the game ends when the unheard songs run out (most cards wins).`;
     warning.classList.remove('hidden');
-  } else if (excluded) {
-    warning.textContent = `${pool.length} playable songs${excludedNote}.`;
+  } else if (excluded || heard) {
+    warning.textContent = `${pool.length} unheard songs${excludedNote}.${heardNote}`;
     warning.classList.remove('hidden');
   } else {
     warning.classList.add('hidden');
@@ -533,9 +540,21 @@ function beginGame(deck, players, settings) {
       ? `${excluded} disliked song${excluded > 1 ? 's are' : ' is'} sitting this game out`
       : 'Too few liked songs left — including disliked ones this game');
   }
+  // Songs are never recycled: a game only deals what nobody has heard.
+  const fresh = unplayedSongs(usable);
+  if (fresh.length < players.length + 1) {
+    const heard = usable.length - fresh.length;
+    if (!confirm(`This deck is used up — ${heard} of its ${usable.length} songs have been played and songs are never repeated.\n\nStart the deck over? (play history clears; ratings, years and previews stay)`)) {
+      toast('Pick another deck, or add songs in the deck editor');
+      return;
+    }
+    resetPlays(storage, deck.id);
+    beginGame(getDeck(storage, deck.id), players, settings);
+    return;
+  }
   game = createGame({
     players,
-    deck: usable.map((s) => ({ ...s })),
+    deck: fresh.map((s) => ({ ...s })),
     cardsToWin: settings.target,
     startTokens: settings.tokens,
     challengesEnabled: settings.challenges,
@@ -557,7 +576,7 @@ function renderGame() {
   renderScoreboard();
   renderPhase();
   renderTimeline();
-  $('#draw-count').textContent = `${game.drawPile.length} songs left in the pile`;
+  $('#draw-count').textContent = `${drawableCount(game)} songs left in the pile`;
 }
 
 function renderScoreboard() {
@@ -598,7 +617,7 @@ function renderPhase() {
       area.append(
         el('p', { class: 'notice', text: 'This song’s preview is unavailable.' }),
         el('div', { class: 'phase-controls' },
-          game.drawPile.length > 0
+          drawableCount(game) > 0
             ? el('button', { class: 'btn btn-primary', text: 'Skip it (free)', onclick: onFreeSkip })
             : el('p', { class: 'phase-sub', text: 'Pile is empty — place it blind for the thrill!' })));
       // fall through: placement (blind) and challenges stay available
@@ -617,7 +636,7 @@ function renderPhase() {
           onclick: () => { const pl = document.getElementById('player'); pl.currentTime = 0; pl.play(); renderPhase(); },
         }));
       }
-      if (previewState !== 'error' && game.drawPile.length > 0) {
+      if (previewState !== 'error' && drawableCount(game) > 0) {
         controls.append(el('button', {
           class: 'btn', text: `⤳ Skip song (1 token)`,
           disabled: active.tokens < 1 ? 'true' : null,
@@ -726,8 +745,22 @@ function buildVoteRow() {
       onclick: () => {
         songVoted.down = true;
         const r = rateSong(storage, gameDeckId, card, -1);
-        toast(r == null ? 'Deck no longer stored — vote not saved'
-          : r < 0 ? 'Cut — it sits out future games (restore in the deck editor)' : 'Noted 👎');
+        const note = r == null ? 'Deck no longer stored — vote not saved'
+          : r < 0 ? 'Cut — it sits out future games (restore in the deck editor)' : 'Noted 👎';
+        // Cutting a song mid-listen is a rejection, not a guess: move on to
+        // another song without charging a token for it.
+        if (game.phase === 'listening' && drawableCount(game) > 0) {
+          stopAudio();
+          freeSkip(game);
+          selectedSlot = null;
+          songVoted = { up: false, down: false }; // fresh song, fresh votes
+          mysteryRetried = false;
+          saveGame();
+          toast(`${note} — skipped, no token spent`, 4000);
+          loadMysteryPreview();
+          return;
+        }
+        toast(note);
         renderGame();
       },
     }));
@@ -901,7 +934,7 @@ async function prefetchUpcoming(count = 3) {
     // refresh only the pile counter — a full re-render could yank buttons
     // out from under a mid-click player
     if (game && game.phase !== 'gameover') {
-      $('#draw-count').textContent = `${game.drawPile.length} songs left in the pile`;
+      $('#draw-count').textContent = `${drawableCount(game)} songs left in the pile`;
     }
   } finally {
     prefetching = false;
@@ -918,7 +951,7 @@ let refilling = false;
 
 async function refillDeck() {
   if (!game || !game.settings.endless || refilling) return;
-  if (game.phase === 'gameover' || game.drawPile.length >= REFILL_BELOW) return;
+  if (game.phase === 'gameover' || drawableCount(game) >= REFILL_BELOW) return;
   refilling = true;
   try {
     const deck = getDeck(storage, gameDeckId);
@@ -985,7 +1018,7 @@ async function refillDeck() {
     if (added && game) {
       saveGame();
       if (game.phase !== 'gameover') {
-        $('#draw-count').textContent = `${game.drawPile.length} songs left in the pile`;
+        $('#draw-count').textContent = `${drawableCount(game)} songs left in the pile`;
       }
     }
   } finally {

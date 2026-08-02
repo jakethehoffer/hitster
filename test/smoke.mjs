@@ -118,9 +118,25 @@ while (turns < 80 && !won) {
   await page.waitForFunction(() => window.__hitster.previewState !== 'loading', { timeout: 30000 });
   // spacebar toggles playback during a turn (must not crash or scroll away)
   if (turns === 1) await page.keyboard.press('Space');
-  // rate the song BEFORE locking in (listening-phase vote row)
+  // Cutting a song mid-listen rejects it AND moves on, for free — so it must
+  // swap the mystery without charging the active player a token.
   if (turns === 3) {
-    if (!(await clickText('👎 Cut it'))) errors.push('no pre-lock dislike button in listening phase');
+    const before = await page.evaluate(() => ({
+      song: window.__hitster.game.mystery.title,
+      tokens: window.__hitster.game.players[window.__hitster.game.current].tokens,
+    }));
+    if (!(await clickText('👎 Cut it'))) {
+      errors.push('no pre-lock dislike button in listening phase');
+    } else {
+      await page.waitForFunction(() => window.__hitster.previewState !== 'loading', { timeout: 30000 });
+      const after = await page.evaluate(() => ({
+        song: window.__hitster.game.mystery.title,
+        tokens: window.__hitster.game.players[window.__hitster.game.current].tokens,
+      }));
+      if (after.song === before.song) errors.push('cutting a song did not move on to another');
+      if (after.tokens !== before.tokens) errors.push('cutting a song cost a token');
+      else console.log('  ✔ cut skips to a new song without spending a token');
+    }
   }
   // place into the first open slot (often wrong on purpose — exercises discard + steal paths)
   await page.evaluate(() => document.querySelector('.slot:not([disabled])').click());

@@ -90,30 +90,32 @@ export function pickHardIndex(drawPile, timeline, rand, { hardWindow = 7, poolMi
 }
 
 // A deck outlives the game it was shuffled for, so cards carry how many times
-// they've been revealed. Draws come from the least-played cards in the pile,
-// which works the deck through its unheard songs before repeating any — and
-// once everything has been heard, the whole pile is level again and normal
-// play resumes.
-function freshestIndices(drawPile) {
-  const plays = drawPile.map((c) => c.plays || 0);
-  const fewest = Math.min(...plays);
-  return plays.reduce((acc, n, i) => (n === fewest ? (acc.push(i), acc) : acc), []);
+// they've been revealed. A song that has been heard is spent: it is never
+// dealt again, in this game or any later one. Played cards may still sit in a
+// pile (a game saved before this rule, or a deck loaded mid-rotation), so the
+// pile's length is not the number of cards actually available.
+function drawableIndices(drawPile) {
+  return drawPile.reduce((acc, c, i) => (c.plays > 0 ? acc : (acc.push(i), acc)), []);
+}
+
+export function drawableCount(state) {
+  return drawableIndices(state.drawPile).length;
 }
 
 function drawCard(state) {
-  const fresh = freshestIndices(state.drawPile);
+  const drawable = drawableIndices(state.drawPile);
   if (state.settings.hardDraws) {
     const idx = pickHardIndex(
       state.drawPile,
       state.players[state.current].timeline,
       nextRand(state),
-      { indices: fresh },
+      { indices: drawable },
     );
     return state.drawPile.splice(idx, 1)[0];
   }
   // Still a top-of-pile draw — the shuffle supplies the randomness — but
   // reaching past cards the group has already heard.
-  return state.drawPile.splice(fresh[fresh.length - 1], 1)[0];
+  return state.drawPile.splice(drawable[drawable.length - 1], 1)[0];
 }
 
 function requirePhase(state, phase) {
@@ -147,7 +149,7 @@ export function insertIntoTimeline(timeline, card) {
 
 export function startTurn(state) {
   requirePhase(state, 'idle');
-  if (state.drawPile.length === 0) throw new Error('Draw pile empty');
+  if (drawableCount(state) === 0) throw new Error('Draw pile empty');
   state.mystery = drawCard(state);
   state.placedSlot = null;
   state.challenges = [];
@@ -157,7 +159,7 @@ export function startTurn(state) {
 
 function redraw(state) {
   requirePhase(state, 'listening');
-  if (state.drawPile.length === 0) throw new Error('Draw pile empty');
+  if (drawableCount(state) === 0) throw new Error('Draw pile empty');
   state.discard.push(state.mystery);
   state.mystery = drawCard(state);
 }
@@ -267,7 +269,7 @@ export function nextTurn(state) {
     state.phase = 'gameover';
     return;
   }
-  if (state.drawPile.length === 0) {
+  if (drawableCount(state) === 0) {
     state.winners = exhaustionWinners(state);
     state.phase = 'gameover';
     return;

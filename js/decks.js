@@ -154,10 +154,30 @@ export function refreshCachedPreviews(storage) {
   return cleared;
 }
 
-// Records that a song was revealed in a game. The engine draws from the
-// least-played cards, so this is what stops the next game replaying the songs
-// you just heard. Best-effort like rateSong: null when the deck or song is
-// gone (deleted mid-game, playing an imported copy).
+// A song that has been revealed is spent — it is never dealt again, so a new
+// game is built only from what nobody has heard yet.
+export function unplayedSongs(songs) {
+  return songs.filter((s) => !(s.plays > 0));
+}
+
+// Puts a used-up deck back into circulation. Only the play history goes;
+// ratings, curated years, previews and dates are the user's and stay put.
+// Returns how many songs came back, or null if the deck is gone.
+export function resetPlays(storage, deckId) {
+  const deck = getDeck(storage, deckId);
+  if (!deck) return null;
+  let restored = 0;
+  for (const song of deck.songs) {
+    if (song.plays > 0) { restored += 1; }
+    delete song.plays;
+  }
+  saveDeck(storage, deck);
+  return restored;
+}
+
+// Records that a song was revealed in a game. The engine will not deal a
+// played song again, so this is what retires it. Best-effort like rateSong:
+// null when the deck or song is gone (deleted mid-game, imported copy).
 export function markPlayed(storage, deckId, card) {
   const deck = getDeck(storage, deckId);
   if (!deck) return null;

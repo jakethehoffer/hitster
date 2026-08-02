@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGame, startTurn, skipSong, freeSkip, placeCard, addChallenge,
-  resolveTurn, awardBonus, nextTurn, isSlotCorrect, pickHardIndex, insertIntoTimeline,
+  resolveTurn, awardBonus, nextTurn, isSlotCorrect, pickHardIndex, insertIntoTimeline, drawableCount,
 } from '../js/engine.js';
 
 const card = (year, title = `song-${year}`) => ({ title, artist: 'artist', year });
@@ -427,23 +427,20 @@ test('freshness outranks hard-draw closeness', () => {
   assert.equal(s.mystery.year, 1950);
 });
 
-test('hard draws still apply among equally fresh songs', () => {
+test('hard draws still apply among the unheard songs', () => {
   const s = freshGame({ hardDraws: true });
   s.players[s.current].timeline = [card(1985)];
-  s.drawPile = [card(1950), card(1984), card(2020)].map((c) => ({ ...c, plays: 1 }));
+  s.drawPile = [card(1950), card(1984), card(2020)];
   startTurn(s);
-  assert.equal(s.mystery.year, 1984, 'closest call among the equally-played');
+  assert.equal(s.mystery.year, 1984, 'closest call among what is left to hear');
 });
 
-test('songs come back around once every one has been played', () => {
-  const s = freshGame({ hardDraws: false });
-  s.drawPile = [
-    { ...card(1970), plays: 1 },
-    { ...card(1980), plays: 1 },
-  ];
+test('hard draws never reach for a played song to get a closer call', () => {
+  const s = freshGame({ hardDraws: true });
+  s.players[s.current].timeline = [card(1985)];
+  s.drawPile = [{ ...card(1984), plays: 1 }, card(1950)];
   startTurn(s);
-  assert.ok(s.mystery, 'an all-played pile still deals a card');
-  assert.equal(s.drawPile.length, 1);
+  assert.equal(s.mystery.year, 1950, 'the closer song is spent, so it stays out');
 });
 
 test('resolveTurn counts the revealed song as played', () => {
@@ -507,4 +504,51 @@ test('a stolen card is inserted in date order within its year', () => {
   const timeline = [dated(2015, '2015-01-01', 'jan'), dated(2015, '2015-12-01', 'dec')];
   insertIntoTimeline(timeline, dated(2015, '2015-06-01', 'jun'));
   assert.deepEqual(timeline.map((c) => c.title), ['jan', 'jun', 'dec']);
+});
+
+// --- songs are never recycled ---
+
+const played = (year, n = 1) => ({ ...card(year), plays: n });
+
+test('drawableCount counts only songs nobody has heard', () => {
+  const s = freshGame();
+  s.drawPile = [played(1970), card(1980), played(1990, 3), card(2000)];
+  assert.equal(drawableCount(s), 2);
+  s.drawPile = [played(1970), played(1990)];
+  assert.equal(drawableCount(s), 0);
+});
+
+test('a song that has been played is never drawn again', () => {
+  const s = freshGame({ hardDraws: false });
+  s.drawPile = [played(1970), card(1980), played(1990)];
+  startTurn(s);
+  assert.equal(s.mystery.year, 1980);
+  // the two played songs remain in the pile but are not drawable
+  assert.equal(s.drawPile.length, 2);
+  assert.equal(drawableCount(s), 0);
+});
+
+test('a pile of only played songs counts as empty for drawing', () => {
+  const s = freshGame();
+  s.drawPile = [played(1970), played(1990)];
+  assert.throws(() => startTurn(s), /empty/i);
+});
+
+test('the game ends by exhaustion when only played songs are left', () => {
+  const s = freshGame({ cardsToWin: 99, hardDraws: false });
+  s.drawPile = [played(1970), card(1980), played(1990)];
+  startTurn(s);
+  placeCard(s, 0);
+  resolveTurn(s);
+  nextTurn(s);
+  assert.equal(s.phase, 'gameover', 'no unheard songs left, so the game is over');
+  assert.ok(Array.isArray(s.winners));
+});
+
+test('skipping needs an unheard song to move to', () => {
+  const s = freshGame({ hardDraws: false });
+  s.drawPile = [played(1970), card(1980)];
+  startTurn(s);
+  assert.equal(s.mystery.year, 1980);
+  assert.throws(() => freeSkip(s), /empty/i, 'nothing unheard to skip to');
 });

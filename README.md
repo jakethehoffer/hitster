@@ -48,8 +48,10 @@ Same as real Hitster:
    it's still playing (before you lock in) and on the reveal screen. Votes
    save to the deck: a net-disliked song sits out all future games (the deck
    editor shows it as excluded, with a Restore button), so decks improve
-   every time you play. You can also 👍/👎 any song directly in the deck
-   editor — handy when you forgot to vote during the game.
+   every time you play. Cutting a song while it's still playing also moves
+   you straight on to another one and costs no token — rejecting a song
+   isn't a guess, so it shouldn't be paid for. You can also 👍/👎 any song
+   directly in the deck editor — handy when you forgot to vote in the game.
 8. First to the target number of cards wins. With **Endless deck** on (the
    default), the pile never runs dry — when it gets low, the game discovers
    new songs by the artists already in your deck (year taken from the song's
@@ -57,11 +59,13 @@ Same as real Hitster:
    can vote on them). If endless is off or you're offline and the deck runs
    out, most cards wins (tokens break ties).
 
-Songs don't repeat between games. Each deck remembers how many times a song
-has been revealed, and draws come from the least-played cards, so a new game
-works through the songs you haven't heard before returning to any of them.
-Once a deck has been played through, everything is level again and the
-rotation starts over.
+Songs are never repeated. Once a song has been revealed it is retired, and no
+later game deals it again — a deck plays through its songs and then stops.
+When too few unheard songs are left to start a game, the app offers to play
+the deck from the top again; declining leaves it alone. Starting over clears
+only the play history, never your ratings, years, previews or dates. With
+**Endless deck** on, discovery keeps adding genuinely new songs, so a deck
+usually grows faster than you can use it up.
 
 Two songs from the same year are ordered by release date when both dates are
 known — the reveal card shows the day and month so you can see why. The date
