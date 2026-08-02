@@ -145,3 +145,11 @@ Files changed: js/app.js, test/smoke.mjs
 Tests run: npm test 92/92; dedicated browser verification reproduced BOTH defects then passed after the fix (demoted card with fails=1 retried to fails=2 and retired to discard; card pushed mid-flight warmed); npm run smoke green end to end incl. all 21 steps; no-recycle and group-persistence browser runs re-checked green; negative test confirmed a real console.error still fails smoke
 Blockers: none - the iTunes 403/429 rate limiting that repeatedly blocked verification today no longer fails the smoke run, it is reported instead
 Next steps: No known defects outstanding. Optional polish, not built: deck editor could show per-song play counts and a manual 'start deck over' button (the reset is currently only offered at game start when a deck is used up).
+
+## 2026-08-02T19:15:08.0814282-04:00 - claude
+
+Summary: Made the never-repeat rule legible in the Decks UI, closing the gap that rule opened. Deck list meta now reports what is left to hear via deckMeta() ('12 unheard of 61', plain count when nothing played). Deck editor summary appends 'N already played and retired', each retired row carries a '✓ played' badge, and a '↺ Start deck over' button (hidden unless something is retired) calls resetPlays with a confirm - clears play history only, keeps ratings/years/previews/released dates. The reset already existed but was reachable only via the prompt raised when a game could not start. Deployed and prod-verified.
+Files changed: js/app.js, index.html, css/style.css, test/smoke.mjs, README.md
+Tests run: npm test 92/92; npm run smoke green incl. new step 'retired songs are visible with a way to bring them back' (asserts after a real game that the editor summary reports retirements, played badges render, and the reset is offered); dedicated browser run on a 12-song deck with 8 retired: list read '4 unheard of 12', editor showed 8 badges + reset, after reset all 12 back in play with rating/released/preview intact and the editor refreshed
+Blockers: none
+Next steps: No known defects or acceptance gaps outstanding. All of today's asks are shipped and prod-verified: correct song versions, same-year ordering by release date, never-recycle, cut-as-free-skip, group persistence across deck changes/restarts, prefetch retry+coalescing, and now deck play-state visibility.
