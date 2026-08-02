@@ -11,7 +11,7 @@ const PREVIEW_ERA_KEY = 'hitster.previewEra';
 // Bumped whenever the resolver's choice of recording changes. A preview URL is
 // derived data — whatever the picker settled on at the time — so a stale one
 // keeps playing a wrong version forever unless it is cleared.
-export const PREVIEW_ERA = 2;
+export const PREVIEW_ERA = 3;
 
 let idCounter = 0;
 function freshId() {

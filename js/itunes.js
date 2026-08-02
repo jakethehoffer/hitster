@@ -93,12 +93,15 @@ function isCredit(seg) {
 // "(Printz Board vs zuper blahq)", "(Edit)" are all different recordings.
 // A featured-artist credit is part of the original title, not an alternate cut.
 export function alienQualifiers(resultTitle, wantTitle) {
-  const want = wantTitle.toLowerCase();
+  const want = bareTitle(wantTitle);
   return qualifiers(resultTitle).filter((s) => {
-    const seg = s.toLowerCase();
-    return !isCredit(s)
-      && !CANONICAL_QUALIFIERS.includes(seg)
-      && !want.includes(seg);
+    if (isCredit(s) || CANONICAL_QUALIFIERS.includes(s.toLowerCase())) return false;
+    // No Latin letters means it's the title written in another script
+    // ("강남스타일"), not a description of a different recording.
+    if (!/[a-z]/i.test(s)) return false;
+    // Compared bare, or the deck's "(Sugar Pie Honey Bunch)" reads as alien
+    // against Deezer's "(Sugar Pie, Honey Bunch)" over one comma.
+    return !want.includes(bareTitle(s));
   });
 }
 
@@ -119,6 +122,11 @@ function billedActs(name) {
     // Articles and honorifics are billing noise: Deezer files the deck's
     // "Ms. Lauryn Hill" under "Lauryn Hill".
     .map((s) => s.trim().replace(/^(?:the|ms|mrs|mr|dr)\.?\s+/, ''))
+    // Stylised spellings are the same act: Ke$ha, P!nk, Beyoncé. Accents are
+    // dropped rather than spaced out, or "Sinéad" would split in two.
+    .map((s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/\$/g, 's').replace(/!/g, 'i')
+      .replace(/[^a-z0-9]+/g, ' ').trim())
     .filter(Boolean);
 }
 
@@ -127,18 +135,41 @@ function artistScore(artist, wantArtist) {
   const acts = billedActs(artist);
   const want = billedActs(wantArtist);
   if (acts.some((x) => want.includes(x))) return 4;
+  // A trailing tag is the same act ("Soulja Boy Tell'em"), but a name that
+  // merely ends with the artist is a different one ("Tonight i'm Taylor
+  // Swift") — so only a leading match counts, and it counts for less. The
+  // shorter name must be at least two words: one word is the start of far too
+  // many unrelated acts ("Queen" / "Queen Esther").
+  const extends_ = (long, short) => short.includes(' ') && long.startsWith(`${short} `);
+  if (acts.some((a) => want.some((w) => extends_(a, w) || extends_(w, a)))) return 2;
   return -6; // a different performer entirely: a cover, not the record we want
 }
+
+// Punctuation is not part of a song's identity: Deezer files The Archies'
+// "Sugar, Sugar" as "Sugar Sugar", and a comma should not hide it. Letters of
+// every script survive — dropping them made "California Love 加洲之愛", a
+// 104-second bootleg, look like an exact match for "California Love".
+function bareTitle(title) {
+  return title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+// Scoring a title that matches nothing at zero let a search miss fall through
+// to any other song by the same artist — "Physical" resolved to "Hopelessly
+// Devoted to You". Off-title results are disqualified, not merely outscored.
+const NOT_THIS_SONG = -1;
 
 export function scoreMatch(card, result) {
   const t = result.title.toLowerCase();
   const a = result.artist.toLowerCase();
   const wantT = card.title.toLowerCase();
   const wantA = card.artist.toLowerCase();
+  const bare = bareTitle(result.title);
+  const wantBare = bareTitle(card.title);
   let score = 0;
-  if (t === wantT) score += 6;
-  else if (t.startsWith(wantT)) score += 3;
-  else if (t.includes(wantT)) score += 1;
+  if (bare === wantBare) score += 6;
+  else if (bare.startsWith(`${wantBare} `)) score += 3;
+  else if (bare.includes(wantBare)) score += 1;
+  else return NOT_THIS_SONG;
   score += artistScore(a, wantA);
   const base = baseTitle(t);
   for (const m of MARKER_RES) {
@@ -151,24 +182,29 @@ export function scoreMatch(card, result) {
   for (const seg of alienQualifiers(result.title, card.title)) {
     score -= Math.max(4, ...MARKER_RES.filter((m) => hasMarker(seg, m)).map((m) => m.cost));
   }
-  // Prefer the explicit original over radio/clean edits when otherwise equal.
-  // Kept below the alternate-cut penalty: an explicit remix must never outrank
-  // the clean original (the Tom Novy dub of "SexyBack" won on this bonus).
-  if (result.explicit) score += 2;
   return score;
+}
+
+// Title and artist decide it; ties go to the more popular recording, and only
+// then to the explicit cut. Popularity has to outrank explicitness: Deezer
+// carries a 153-second "HELLO" credited to Adele that is flagged explicit, and
+// an explicit bonus inside the score was enough to beat the real single.
+function betterThan(card, r, best) {
+  const s = scoreMatch(card, r);
+  const bs = scoreMatch(card, best);
+  if (s !== bs) return s > bs;
+  const rank = r.rank || 0;
+  const bestRank = best.rank || 0;
+  if (rank !== bestRank) return rank > bestRank;
+  return !!r.explicit && !best.explicit;
 }
 
 export function pickBestMatch(card, results) {
   let best = null;
-  let bestScore = 0; // require a positive score — a bad match is worse than none
   for (const r of results) {
-    const s = scoreMatch(card, r);
-    // Deezer's rank separates the hit master from reissues and duplicates that
-    // score identically.
-    if (s > bestScore || (s === bestScore && best && (r.rank || 0) > (best.rank || 0))) {
-      bestScore = s;
-      best = r;
-    }
+    // require a positive score — a bad match is worse than none
+    if (scoreMatch(card, r) <= 0) continue;
+    if (!best || betterThan(card, r, best)) best = r;
   }
   return best;
 }
