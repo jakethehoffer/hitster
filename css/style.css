@@ -225,7 +225,7 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 .clue-note { color: var(--ink-dim); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 .clue-cover { padding: .35rem; }
 .clue-cover img {
-  width: 5.5rem; height: 5.5rem; border-radius: 10px; object-fit: cover;
+  width: 7rem; height: 7rem; border-radius: 10px; object-fit: cover;
   display: block;
 }
 
@@ -435,9 +435,9 @@ body.in-game .deck-stage.compact {
 }
 body.in-game .clue { padding: .3rem .7rem; }
 body.in-game .clue-cover img {
-  width: clamp(3.2rem, 9vh, 5.5rem); height: clamp(3.2rem, 9vh, 5.5rem);
+  width: clamp(3.6rem, 12vh, 7rem); height: clamp(3.6rem, 12vh, 7rem);
 }
-body.in-game .clue-text { font-size: clamp(1rem, 3vh, 1.45rem); }
+body.in-game .clue-text { font-size: clamp(1.05rem, 3.4vh, 1.7rem); }
 body.in-game .btn-big { padding: .65rem 1.6rem; }
 body.in-game .challenge-picker + .phase-sub + .phase-controls { margin: 0; padding: .45rem; }
 body.in-game .challenge-picker { margin: 0; }
