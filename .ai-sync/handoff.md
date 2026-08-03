@@ -153,3 +153,11 @@ Files changed: js/app.js, index.html, css/style.css, test/smoke.mjs, README.md
 Tests run: npm test 92/92; npm run smoke green incl. new step 'retired songs are visible with a way to bring them back' (asserts after a real game that the editor summary reports retirements, played badges render, and the reset is offered); dedicated browser run on a 12-song deck with 8 retired: list read '4 unheard of 12', editor showed 8 badges + reset, after reset all 12 back in play with rating/released/preview intact and the editor refreshed
 Blockers: none
 Next steps: No known defects or acceptance gaps outstanding. All of today's asks are shipped and prod-verified: correct song versions, same-year ordering by release date, never-recycle, cut-as-free-skip, group persistence across deck changes/restarts, prefetch retry+coalescing, and now deck play-state visibility.
+
+## 2026-08-02T20:24:28.5678961-04:00 - codex
+
+Summary: Implemented and pushed shared starter cards, challenge confirmation with cancel/deselect and deferred token spend, larger timelines/slots, and full release dates on timeline cards. Feature commit: 79f658a on origin/master.
+Files changed: js/engine.js, test/engine.test.mjs, js/app.js, css/style.css
+Tests run: npm test: 94/94 passed; node --check js/app.js passed; git diff --check passed; live desktop and 390px mobile browser verification passed with zero console errors/warnings; npm run smoke has one stale assertion failure at test/smoke.mjs:168 because it expects a challenge immediately after slot selection.
+Blockers: Automated smoke test is not green until test/smoke.mjs is updated for the new select-then-confirm challenge flow; implementation and manual end-to-end verification passed.
+Next steps: Update test/smoke.mjs challenge flow to select a slot, assert no token spend, click Confirm challenge, then assert .slot.challenged and token deduction; rerun npm run smoke and commit/push that test-only follow-up.
