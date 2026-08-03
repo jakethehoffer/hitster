@@ -9,6 +9,7 @@ export function deezerTrackToCard(track) {
     artist: track.artist ? track.artist.name : '',
     previewUrl: track.preview || undefined,
     artworkUrl: track.album && track.album.cover_medium ? track.album.cover_medium : undefined,
+    albumTitle: track.album && track.album.title ? track.album.title : undefined,
     explicit: track.explicit_lyrics ? true : undefined,
     rank: typeof track.rank === 'number' ? track.rank : undefined,
   };

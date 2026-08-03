@@ -37,6 +37,9 @@ export function createGame({
   if (!Array.isArray(deck) || deck.length < players.length + 1) {
     throw new Error('Deck too small for this player count');
   }
+  if (new Set(deck.map((card) => card.year)).size < 2) {
+    throw new Error('Deck needs songs from at least 2 different years');
+  }
   const rng = mulberry32(rngSeed);
   const drawPile = shuffled(deck, rng);
   const baseCard = drawPile.pop();
@@ -56,6 +59,7 @@ export function createGame({
     placedSlot: null,
     challenges: [],
     outcome: null,
+    hintUsed: false,
     winners: null,
     settings: { cardsToWin, startTokens, challengesEnabled, endless, hardDraws },
     rngState: rngSeed + 1,
@@ -95,17 +99,24 @@ export function pickHardIndex(drawPile, timeline, rand, { hardWindow = 7, poolMi
 // they've been revealed. A song that has been heard is spent: it is never
 // dealt again, in this game or any later one. Played cards may still sit in a
 // pile (a game saved before this rule, or a deck loaded mid-rotation), so the
-// pile's length is not the number of cards actually available.
-function drawableIndices(drawPile) {
-  return drawPile.reduce((acc, c, i) => (c.plays > 0 ? acc : (acc.push(i), acc)), []);
+// pile's length is not the number of cards actually available. A second song
+// from a year already on the active timeline is also ineligible for that turn.
+function drawableIndices(drawPile, timeline = []) {
+  const timelineYears = new Set(timeline.map((c) => c.year));
+  return drawPile.reduce((acc, c, i) => (
+    c.plays > 0 || timelineYears.has(c.year) ? acc : (acc.push(i), acc)
+  ), []);
 }
 
-export function drawableCount(state) {
-  return drawableIndices(state.drawPile).length;
+export function drawableCount(state, playerIdx = state.current) {
+  return drawableIndices(state.drawPile, state.players[playerIdx].timeline).length;
 }
 
 function drawCard(state) {
-  const drawable = drawableIndices(state.drawPile);
+  const drawable = drawableIndices(
+    state.drawPile,
+    state.players[state.current].timeline,
+  );
   if (state.settings.hardDraws) {
     const idx = pickHardIndex(
       state.drawPile,
@@ -151,8 +162,9 @@ export function insertIntoTimeline(timeline, card) {
 
 export function startTurn(state) {
   requirePhase(state, 'idle');
-  if (drawableCount(state) === 0) throw new Error('Draw pile empty');
+  if (drawableCount(state) === 0) throw new Error('Draw pile empty: no songs from a new year left');
   state.mystery = drawCard(state);
+  state.hintUsed = false;
   state.placedSlot = null;
   state.challenges = [];
   state.outcome = null;
@@ -161,9 +173,10 @@ export function startTurn(state) {
 
 function redraw(state) {
   requirePhase(state, 'listening');
-  if (drawableCount(state) === 0) throw new Error('Draw pile empty');
+  if (drawableCount(state) === 0) throw new Error('Draw pile empty: no songs from a new year left');
   state.discard.push(state.mystery);
   state.mystery = drawCard(state);
+  state.hintUsed = false;
 }
 
 export function skipSong(state) {
@@ -176,6 +189,15 @@ export function skipSong(state) {
 
 export function freeSkip(state) {
   redraw(state);
+}
+
+export function buyHint(state) {
+  requirePhase(state, 'listening');
+  const active = state.players[state.current];
+  if (active.tokens < 1) throw new Error('No tokens for a hint');
+  if (state.hintUsed) throw new Error('Hint already used for this song');
+  active.tokens -= 1;
+  state.hintUsed = true;
 }
 
 export function placeCard(state, slot) {
@@ -271,7 +293,18 @@ export function nextTurn(state) {
     state.phase = 'gameover';
     return;
   }
-  if (drawableCount(state) === 0) {
+  // A late-game pile can be unusable for one timeline but valid for another.
+  // Pass over players who have every remaining year instead of violating the
+  // no-repeat-year rule or ending a game somebody can still play.
+  let nextPlayer = null;
+  for (let offset = 1; offset <= state.players.length; offset++) {
+    const candidate = (state.current + offset) % state.players.length;
+    if (drawableCount(state, candidate) > 0) {
+      nextPlayer = candidate;
+      break;
+    }
+  }
+  if (nextPlayer == null) {
     state.winners = exhaustionWinners(state);
     state.phase = 'gameover';
     return;
@@ -280,6 +313,7 @@ export function nextTurn(state) {
   state.placedSlot = null;
   state.challenges = [];
   state.outcome = null;
-  state.current = (state.current + 1) % state.players.length;
+  state.hintUsed = false;
+  state.current = nextPlayer;
   state.phase = 'idle';
 }

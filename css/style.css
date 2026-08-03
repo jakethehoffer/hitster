@@ -142,16 +142,26 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 .song-item .song-year { color: var(--gold); font-weight: 700; }
 .rating-badge { color: var(--ok); font-size: .85rem; font-weight: 700; white-space: nowrap; }
 .rating-badge.negative { color: var(--bad); }
+.catalog-badge {
+  color: var(--gold);
+  border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
+  border-radius: 999px;
+  padding: .12rem .4rem;
+  font-size: .72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
 .played-badge { color: var(--ink-dim); font-size: .85rem; font-weight: 700; white-space: nowrap; }
 .explicit-badge { margin-left: .35rem; font-size: .85em; opacity: .75; }
 
 /* ---------- setup ---------- */
 
 .setup-grid { display: flex; gap: 1.2rem; flex-wrap: wrap; margin-bottom: 1.4rem; }
-.setup-field { display: flex; flex-direction: column; gap: .35rem; }
+.setup-field { display: flex; flex-direction: column; gap: .35rem; min-width: 0; max-width: 100%; }
 .setup-field > span { color: var(--ink-dim); font-size: .85rem; }
 .setup-check { flex-direction: row; align-items: center; gap: .6rem; align-self: end; }
 .setup-check input { width: 1.2rem; height: 1.2rem; accent-color: var(--accent); }
+#setup-deck { max-width: 100%; }
 
 .player-inputs { display: grid; gap: .6rem; margin: .8rem 0; max-width: 26rem; }
 .player-row { display: flex; gap: .5rem; }
@@ -181,6 +191,13 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 .phase-title { font-size: 1.5rem; margin-bottom: 1rem; }
 .phase-title .who { color: var(--accent); }
 .phase-sub { color: var(--ink-dim); margin-bottom: 1rem; }
+
+.song-hint {
+  width: fit-content; margin: 1rem auto; padding: .65rem 1rem;
+  color: var(--gold); font-weight: 800;
+  background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.35);
+  border-radius: var(--radius);
+}
 
 .phase-controls { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem; }
 
@@ -291,6 +308,12 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 
 @media (max-width: 640px) {
   .hero { padding-top: 4vh; }
+  .setup-field:first-child { flex: 1 1 100%; width: 100%; }
+  #setup-deck { width: 100%; min-width: 0; }
+  .search-row { flex-wrap: wrap; }
+  .search-row input { flex: 1 1 100%; min-width: 0; }
+  .song-item { flex-wrap: wrap; gap: .5rem; }
+  .song-item .song-text { flex: 1 1 min(100%, 12rem); }
   .timeline { gap: .45rem; padding-inline: .15rem; }
   .timeline-card { width: 8.2rem; min-height: 6.8rem; padding: .75rem .55rem; }
   .timeline-card .tc-year { font-size: 1.65rem; }

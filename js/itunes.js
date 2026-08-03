@@ -183,6 +183,16 @@ export function scoreMatch(card, result) {
   for (const seg of alienQualifiers(result.title, card.title)) {
     score -= Math.max(4, ...MARKER_RES.filter((m) => hasMarker(seg, m)).map((m) => m.cost));
   }
+  // Some Deezer rows hide the alternate cut in the album only. In particular,
+  // its current plain-titled "Hips Don't Lie" result comes from an album whose
+  // name ends in LIVE. Without carrying and scoring that metadata, the live
+  // recording looks more exact than the original single.
+  const album = result.albumTitle || '';
+  for (const m of MARKER_RES) {
+    if (hasMarker(album, m) && !hasMarker(wantT, m) && !hasMarker(wantA, m)) {
+      score -= m.cost;
+    }
+  }
   return score;
 }
 

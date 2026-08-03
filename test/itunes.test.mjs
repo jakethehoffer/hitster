@@ -107,6 +107,21 @@ test('the album original outscores the radio edit of the same song', () => {
   assert.equal(best.previewUrl, 'orig');
 });
 
+test("Hips Don't Lie original beats a plain-titled recording from a live album", () => {
+  const card = { title: "Hips Don't Lie", artist: 'Shakira' };
+  const best = pickBestMatch(card, [
+    {
+      title: "Hips Don't Lie", artist: 'Shakira', previewUrl: 'live', rank: 946905,
+      albumTitle: 'Anniversary | Oral Fixation (20th) and Pies Descalzos (30th) LIVE',
+    },
+    {
+      title: "Hips Don't Lie (feat. Wyclef Jean)", artist: 'Shakira',
+      previewUrl: 'original', rank: 827875, albumTitle: 'Oral Fixation, Vol. 2 (Expanded Edition)',
+    },
+  ]);
+  assert.equal(best.previewUrl, 'original');
+});
+
 // "Stayin' Alive" and "Alive" contain the letters of the marker word "live".
 // Substring matching read them as live recordings and silently disabled the
 // alternate-cut penalty for every result of those cards.

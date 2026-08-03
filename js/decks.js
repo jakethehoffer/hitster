@@ -11,7 +11,7 @@ const PREVIEW_ERA_KEY = 'hitster.previewEra';
 // Bumped whenever the resolver's choice of recording changes. A preview URL is
 // derived data — whatever the picker settled on at the time — so a stale one
 // keeps playing a wrong version forever unless it is cleared.
-export const PREVIEW_ERA = 3;
+export const PREVIEW_ERA = 4;
 
 let idCounter = 0;
 function freshId() {
@@ -104,19 +104,35 @@ export function parseDeckImport(jsonString) {
       rating: Number.isInteger(s.rating) ? s.rating : undefined,
       released: typeof s.released === 'string' ? s.released : undefined,
       explicit: s.explicit === true ? true : undefined,
+      // Archive-only entries can live in a catalogue deck without being sent
+      // to third-party preview search. A deliberately selected preview makes
+      // the entry playable again (see the deck editor flow in app.js).
+      previewUnavailable: s.previewUnavailable === true ? true : undefined,
+      catalogStatus: typeof s.catalogStatus === 'string' ? s.catalogStatus : undefined,
     })),
   };
 }
 
 // ---------- ratings (the like/dislike learning loop) ----------
 
+// Some specialist decks also catalogue recordings that have no authorised
+// preview on the services the game uses. Keep those entries visible/exportable
+// without repeatedly searching for (or accidentally matching) bootleg audio.
+export function availableSongs(songs) {
+  return songs.filter((s) => s.previewUnavailable !== true);
+}
+
+export function unavailableCount(songs) {
+  return songs.length - availableSongs(songs).length;
+}
+
 // Songs the group has net-disliked stay in the deck but sit out of new games.
 export function playableSongs(songs) {
-  return songs.filter((s) => (s.rating ?? 0) >= 0);
+  return availableSongs(songs).filter((s) => (s.rating ?? 0) >= 0);
 }
 
 export function excludedCount(songs) {
-  return songs.length - playableSongs(songs).length;
+  return availableSongs(songs).filter((s) => (s.rating ?? 0) < 0).length;
 }
 
 // Applies a thumbs up (+1) / down (-1) to the matching song in the stored

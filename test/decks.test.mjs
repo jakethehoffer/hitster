@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
   exportDeck, parseDeckImport, ensureSeedDecks, refreshCachedPreviews, markPlayed,
-  playableSongs, excludedCount, rateSong, unplayedSongs, resetPlays,
+  availableSongs, playableSongs, excludedCount, unavailableCount,
+  rateSong, unplayedSongs, resetPlays,
 } from '../js/decks.js';
 import { SEED_DECKS } from '../js/seed-deck.js';
 
@@ -38,14 +39,16 @@ test('deleteDeck removes deck and index entry', () => {
   assert.equal(getDeck(storage, deck.id), null);
 });
 
-test('exportDeck/parseDeckImport roundtrip preserves songs, ratings, and explicitness', () => {
-  const deck = { id: 'x', name: 'Mix', songs: [{ title: 'T', artist: 'A', year: 2001, previewUrl: 'http://p', artworkUrl: 'http://a', rating: -1, explicit: true }] };
+test('exportDeck/parseDeckImport roundtrip preserves songs, ratings, explicitness, and archive status', () => {
+  const deck = { id: 'x', name: 'Mix', songs: [{ title: 'T', artist: 'A', year: 2001, previewUrl: 'http://p', artworkUrl: 'http://a', rating: -1, explicit: true, previewUnavailable: true, catalogStatus: 'unreleased' }] };
   const parsed = parseDeckImport(exportDeck(deck));
   assert.equal(parsed.name, 'Mix');
   assert.equal(parsed.songs.length, 1);
   assert.equal(parsed.songs[0].year, 2001);
   assert.equal(parsed.songs[0].rating, -1);
   assert.equal(parsed.songs[0].explicit, true);
+  assert.equal(parsed.songs[0].previewUnavailable, true);
+  assert.equal(parsed.songs[0].catalogStatus, 'unreleased');
   assert.notEqual(parsed.id, 'x'); // import mints a fresh id to avoid collisions
 });
 
@@ -139,6 +142,31 @@ test('playableSongs excludes net-disliked songs only', () => {
   ];
   assert.deepEqual(playableSongs(songs).map((s) => s.title), ['A', 'B', 'C']);
   assert.equal(excludedCount(songs), 1);
+});
+
+test('Name That Tune: Eminem contains the complete reviewed song catalogue', () => {
+  const seed = SEED_DECKS.find((d) => d.key === 'eminem-name-that-tune');
+  assert.ok(seed, 'missing Eminem deck');
+  assert.equal(seed.songs.length, 772);
+  assert.equal(availableSongs(seed.songs).length, 514);
+  assert.equal(unavailableCount(seed.songs), 258);
+  assert.ok(seed.songs.some((s) => s.title === 'My Name Is' && s.year === 1999));
+  assert.ok(seed.songs.some((s) => s.title === 'Lose Yourself' && s.year === 2002));
+  assert.ok(seed.songs.some((s) => s.title === 'Houdini' && s.year === 2024));
+  assert.ok(seed.songs.some((s) => s.title === 'Marshall Powers'
+    && s.catalogStatus === 'unreleased' && s.previewUnavailable));
+});
+
+test('archive-only recordings stay catalogued but never enter a game pool', () => {
+  const songs = [
+    { title: 'Released', artist: 'x', year: 2000 },
+    { title: 'Leak', artist: 'x', year: 2001, previewUnavailable: true, catalogStatus: 'unreleased' },
+    { title: 'Disliked', artist: 'x', year: 2002, rating: -1 },
+  ];
+  assert.deepEqual(availableSongs(songs).map((s) => s.title), ['Released', 'Disliked']);
+  assert.deepEqual(playableSongs(songs).map((s) => s.title), ['Released']);
+  assert.equal(excludedCount(songs), 1);
+  assert.equal(unavailableCount(songs), 1);
 });
 
 test('rateSong persists thumbs up/down to the stored deck', () => {

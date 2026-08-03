@@ -34,16 +34,18 @@ Same as real Hitster:
    button or the **spacebar** (it picks up where it left off). With **Hard
    draws** on (the default), the game picks songs whose years land close to
    the cards already in your timeline — placements are always a genuine call,
-   never a gimme decades outside your range.
+   never a gimme decades outside your range. A mystery song never shares a
+   year with a card already on the active player's timeline.
+   Need help? **💡 Hint** costs 1 token and reveals the song's decade.
 3. Tap the slot in your timeline where you think the song belongs
    (before/between/after your cards), then press **Lock it in**.
 4. Anyone else who thinks you're wrong can **challenge** for 1 token: tap
    their name, then the slot they think is right. A successful steal gets
    the token back; any failed challenge loses it.
-5. **Reveal!** Correct placement keeps the card (ties on the same year count
-   as correct). If you were wrong and a challenger was right, they steal it.
+5. **Reveal!** Correct placement keeps the card. If you were wrong and a
+   challenger was right, they steal it.
 6. If anyone named the artist **and** title out loud, tap their name under
-   "Grab a token" (honor system). Tokens buy song skips and challenges.
+   "Grab a token" (honor system). Tokens buy song skips, decade hints, and challenges.
 7. Vote **👍 Keep it** or **👎 Cut it** on the song itself — available while
    it's still playing (before you lock in) and on the reveal screen. Votes
    save to the deck: a net-disliked song sits out all future games (the deck
@@ -69,11 +71,10 @@ Starting over clears only the play history, never your ratings, years,
 previews or dates. With **Endless deck** on, discovery keeps adding genuinely
 new songs, so a deck usually grows faster than you can use it up.
 
-Two songs from the same year are ordered by release date when both dates are
-known — the reveal card shows the day and month so you can see why. The date
-is only trusted when it agrees with the song's year (iTunes hands back album
-and compilation dates too), and when either song's date is unknown the game
-accepts both sides, exactly as it did before.
+Normal draws exclude years already on the active timeline. Older saved games
+and challenge steals can still produce same-year cards; those are ordered by
+release date when both dates are known, with either side accepted when a date
+is unavailable.
 
 The group is set up once. Player names, cards-to-win, tokens and the toggles
 are remembered, so **Play again** on the win screen drops you straight into
@@ -105,13 +106,22 @@ on the home screen picks up where you left off.
 `.hitster.json` file, send it to a friend, and they click **⇪ Import JSON** on
 their Decks screen. Decks live in each browser's localStorage.
 
-Six built-in decks are included, each big enough for a game to 10 cards:
+Seven built-in decks are included, each big enough for a game to 10 cards:
 the **Starter deck** (61 hits, 1966–2024), **Rap & Hip-Hop** (61, 1979–2024),
 **Pop Through the Decades** (61, 1963–2024), **Rock Anthems** (50, 1965–2020),
-**R&B & Soul** (45, 1961–2023), and **2000s & 2010s Throwbacks** (42).
+**R&B & Soul** (45, 1961–2023), **2000s & 2010s Throwbacks** (42), and
+**Name That Tune: Eminem — Complete Catalog** (772 song recordings, 1988–2025).
 They're normal decks — edit, prune with 👎 votes, or delete them. When an
 update adds songs to a built-in deck, your copy gets the new songs on next
 load with all your ratings and edits kept.
+
+The Eminem deck separates 514 commercially/publicly released recordings from
+258 documented demos, leaks, freestyles, and other archive recordings. The
+archive entries are included for catalog completeness and labelled in the deck
+editor, but they are not dealt automatically because Deezer and iTunes do not
+provide authorised previews for them. Selecting an exact legal preview through
+the editor makes that entry playable. Spoken skits/interludes and project-title
+placeholders are not counted as songs.
 
 Previews resolve to the original recording: the lookup asks Deezer by artist
 and track field (free-text search sometimes buries the real single under

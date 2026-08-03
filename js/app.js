@@ -1,13 +1,14 @@
 import {
   createGame, startTurn, skipSong, freeSkip, placeCard, addChallenge,
-  resolveTurn, awardBonus, nextTurn, drawableCount,
+  resolveTurn, awardBonus, nextTurn, drawableCount, buyHint,
 } from './engine.js';
 import { searchSongs, resolvePreview, resolveReleaseDate, looksLikeAltVersion } from './itunes.js';
 import { artistTopTracks, albumYear, looksLikeCompilation } from './deezer.js';
 import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
   exportDeck, parseDeckImport, ensureSeedDecks, refreshCachedPreviews,
-  playableSongs, excludedCount, rateSong, markPlayed, unplayedSongs, resetPlays,
+  availableSongs, playableSongs, excludedCount, unavailableCount,
+  rateSong, markPlayed, unplayedSongs, resetPlays,
 } from './decks.js';
 
 const SAVE_KEY = 'hitster.savedGame';
@@ -184,10 +185,13 @@ function renderHome() {
 // A played song is retired, so the raw song count stops describing what a
 // deck can still deal — say how much of it is left to hear.
 function deckMeta(deck) {
-  const unheard = unplayedSongs(deck.songs).length;
-  return unheard === deck.songs.length
-    ? `${deck.songs.length} songs`
-    : `${unheard} unheard of ${deck.songs.length}`;
+  const available = availableSongs(deck.songs);
+  const unheard = unplayedSongs(available).length;
+  const archived = unavailableCount(deck.songs);
+  if (archived) return `${unheard} playable · ${deck.songs.length} catalogued`;
+  return unheard === available.length
+    ? `${available.length} songs`
+    : `${unheard} unheard of ${available.length}`;
 }
 
 function renderDeckList() {
@@ -255,6 +259,7 @@ function bumpRating(song, delta) {
 function renderDeckSongs() {
   const deck = getDeck(storage, editingDeckId);
   const excluded = excludedCount(deck.songs);
+  const archived = unavailableCount(deck.songs);
   // Keep original indices: year-edit and delete address songs by position.
   const term = $('#deck-filter').value.trim().toLowerCase();
   const entries = deck.songs
@@ -267,7 +272,8 @@ function renderDeckSongs() {
     ? `${entries.length} of ${deck.songs.length} songs match`
     : `${deck.songs.length} songs in this deck`)
     + (played ? ` — ${played} already played and retired` : '')
-    + (excluded ? ` — ${excluded} excluded by 👎` : '');
+    + (excluded ? ` — ${excluded} excluded by 👎` : '')
+    + (archived ? ` — ${archived} archive-only` : '');
   // Only offer the reset when there is something to bring back.
   $('#btn-reset-plays').classList.toggle('hidden', played === 0);
   const list = clear($('#deck-songs'));
@@ -298,7 +304,7 @@ function renderDeckSongs() {
       song.previewUrl
         ? el('button', { class: 'btn btn-small listen-btn', text: '▶', onclick: (e) => toggleListen(song.previewUrl, e.target) })
         : null,
-      el('button', {
+      !song.previewUnavailable ? el('button', {
         class: 'btn btn-small', text: '↻ Fix preview', title: 'Re-fetch the preview (fixes wrong versions)',
         onclick: async (e) => {
           e.target.disabled = true;
@@ -319,7 +325,7 @@ function renderDeckSongs() {
             e.target.disabled = false;
           }
         },
-      }),
+      }) : null,
       el('button', {
         class: 'btn btn-small', text: '👍', title: 'Like this pick',
         onclick: () => bumpRating(song, 1),
@@ -330,6 +336,11 @@ function renderDeckSongs() {
       }),
       rating > 0 ? el('span', { class: 'rating-badge', text: `👍${rating}` }) : null,
       rating < 0 ? el('span', { class: 'rating-badge negative', text: '👎 excluded' }) : null,
+      song.previewUnavailable ? el('span', {
+        class: 'catalog-badge',
+        text: song.catalogStatus === 'unreleased' ? 'archive · unreleased' : 'archive only',
+        title: 'Catalogued for completeness; no authorised Deezer/iTunes preview is known',
+      }) : null,
       // why a song stopped coming up
       song.plays > 0 ? el('span', { class: 'played-badge', text: '✓ played' }) : null,
       rating < 0 ? el('button', {
@@ -413,6 +424,7 @@ function renderSearchResults(results) {
           target.previewUrl = card.previewUrl;
           target.artworkUrl = card.artworkUrl || target.artworkUrl;
           target.explicit = card.explicit;
+          delete target.previewUnavailable;
           saveDeck(storage, d);
           toast(`"${target.title}" will now play this version`);
           renderDeckSongs();
@@ -494,7 +506,11 @@ function renderSetup() {
   const select = clear($('#setup-deck'));
   const decks = listDecks(storage);
   for (const d of decks) {
-    select.append(el('option', { value: d.id, text: `${d.name} (${d.songs.length} songs)` }));
+    const available = availableSongs(d.songs).length;
+    const count = available === d.songs.length
+      ? `${d.songs.length} songs`
+      : `${available} playable / ${d.songs.length} catalogued`;
+    select.append(el('option', { value: d.id, text: `${d.name} (${count})` }));
   }
   $('#btn-start-game').disabled = decks.length === 0;
   if (decks.length === 0) toast('Create a deck first');
@@ -542,7 +558,7 @@ function startWithSameGroup(deckId) {
   const deck = getDeck(storage, deckId ?? (last && last.deckId));
   if (!last || !deck) { showScreen('setup'); return; }
   const { players, deckId: _ignored, ...settings } = last;
-  if (deck.songs.length < players.length + 1) {
+  if (availableSongs(deck.songs).length < players.length + 1) {
     toast(`"${deck.name}" needs at least ${players.length + 1} songs for ${players.length} players.`);
     showScreen('setup');
     return;
@@ -564,25 +580,29 @@ function updateDeckWarning() {
   const target = parseInt($('#setup-target').value, 10);
   const comfy = players * target + 10;
   const playable = playableSongs(deck.songs);
-  const excluded = deck.songs.length - playable.length;
+  const available = availableSongs(deck.songs);
+  const excluded = available.length - playable.length;
+  const archived = unavailableCount(deck.songs);
   // Songs are never repeated, so what matters is how many are still unheard.
   const pool = unplayedSongs(playable);
   const heard = playable.length - pool.length;
   const endless = $('#setup-endless').checked;
   const excludedNote = excluded
     ? ` (${excluded} disliked song${excluded > 1 ? 's' : ''} excluded — restore in the deck editor)` : '';
+  const archiveNote = archived
+    ? ` ${archived} archive-only recording${archived > 1 ? 's are' : ' is'} catalogued but not dealt.` : '';
   const heardNote = heard ? ` ${heard} already played and retired.` : '';
   if (pool.length < players + 1) {
-    warning.textContent = `Only ${pool.length} unheard songs left${excludedNote}.${heardNote} Starting a game will offer to play the deck from the top again.`;
+    warning.textContent = `Only ${pool.length} unheard songs left${excludedNote}.${heardNote}${archiveNote} Starting a game will offer to play the deck from the top again.`;
     warning.classList.remove('hidden');
   } else if (pool.length < comfy && endless) {
-    warning.textContent = `${pool.length} unheard songs${excludedNote}.${heardNote} Endless refill will top it up with new songs from its artists as you play.`;
+    warning.textContent = `${pool.length} unheard songs${excludedNote}.${heardNote}${archiveNote} Endless refill will top it up with new songs from its artists as you play.`;
     warning.classList.remove('hidden');
   } else if (pool.length < comfy) {
-    warning.textContent = `${pool.length} unheard songs${excludedNote}.${heardNote} Comfortable for these settings is ${comfy}+. You can still play; the game ends when the unheard songs run out (most cards wins).`;
+    warning.textContent = `${pool.length} unheard songs${excludedNote}.${heardNote}${archiveNote} Comfortable for these settings is ${comfy}+. You can still play; the game ends when the unheard songs run out (most cards wins).`;
     warning.classList.remove('hidden');
-  } else if (excluded || heard) {
-    warning.textContent = `${pool.length} unheard songs${excludedNote}.${heardNote}`;
+  } else if (excluded || heard || archived) {
+    warning.textContent = `${pool.length} unheard songs${excludedNote}.${heardNote}${archiveNote}`;
     warning.classList.remove('hidden');
   } else {
     warning.classList.add('hidden');
@@ -611,10 +631,18 @@ function saveGame() {
 }
 
 function beginGame(deck, players, settings) {
-  // Disliked songs sit out — unless that would leave too few to play with.
+  // Disliked songs sit out unless that would leave too few to play with.
+  // Archive-only records never enter the draw pool: an automatic lookup can
+  // neither license a leak nor safely distinguish one from a same-titled song.
+  const available = availableSongs(deck.songs);
   const pool = playableSongs(deck.songs);
-  const excluded = deck.songs.length - pool.length;
-  const usable = pool.length >= players.length + 1 ? pool : deck.songs;
+  const excluded = available.length - pool.length;
+  const usable = pool.length >= players.length + 1 ? pool : available;
+  if (usable.length < players.length + 1) {
+    toast(`"${deck.name}" needs at least ${players.length + 1} playable songs for ${players.length} players.`);
+    showScreen('setup');
+    return;
+  }
   if (excluded > 0) {
     toast(usable === pool
       ? `${excluded} disliked song${excluded > 1 ? 's are' : ' is'} sitting this game out`
@@ -630,6 +658,10 @@ function beginGame(deck, players, settings) {
     }
     resetPlays(storage, deck.id);
     beginGame(getDeck(storage, deck.id), players, settings);
+    return;
+  }
+  if (new Set(fresh.map((song) => song.year)).size < 2) {
+    toast('This deck needs unheard songs from at least 2 different years.');
     return;
   }
   game = createGame({
@@ -656,7 +688,7 @@ function renderGame() {
   renderScoreboard();
   renderPhase();
   renderTimeline();
-  $('#draw-count').textContent = `${drawableCount(game)} songs left in the pile`;
+  $('#draw-count').textContent = `${drawableCount(game)} different-year songs available`;
 }
 
 function renderScoreboard() {
@@ -723,9 +755,20 @@ function renderPhase() {
           onclick: onSkip,
         }));
       }
+      if (!game.hintUsed) {
+        controls.append(el('button', {
+          class: 'btn', text: '💡 Hint (1 token)',
+          disabled: active.tokens < 1 ? 'true' : null,
+          onclick: onHint,
+        }));
+      }
       area.append(
         el('h2', { class: 'phase-title' }, el('span', { class: 'who', text: activeName() }), ' — where does it go?'),
         controls,
+        game.hintUsed ? el('p', {
+          class: 'song-hint',
+          text: `💡 Released in the ${Math.floor(game.mystery.year / 10) * 10}s`,
+        }) : null,
         el('p', { class: 'phase-sub', text: 'Tap a slot in your timeline below, then lock it in. Spacebar pauses/plays.' }));
       if (selectedSlot != null) {
         area.append(el('div', { class: 'phase-controls' },
@@ -1061,7 +1104,7 @@ async function runPrefetch(count) {
   // refresh only the pile counter — a full re-render could yank buttons
   // out from under a mid-click player
   if (game && game.phase !== 'gameover') {
-    $('#draw-count').textContent = `${drawableCount(game)} songs left in the pile`;
+    $('#draw-count').textContent = `${drawableCount(game)} different-year songs available`;
   }
 }
 
@@ -1142,7 +1185,7 @@ async function refillDeck() {
     if (added && game) {
       saveGame();
       if (game.phase !== 'gameover') {
-        $('#draw-count').textContent = `${drawableCount(game)} songs left in the pile`;
+        $('#draw-count').textContent = `${drawableCount(game)} different-year songs available`;
       }
     }
   } finally {
@@ -1270,6 +1313,14 @@ function onLockPlacement() {
   }
   saveGame();
   renderGame();
+}
+
+function onHint() {
+  try {
+    buyHint(game);
+    saveGame();
+    renderGame();
+  } catch (err) { toast(err.message); }
 }
 
 function onConfirmChallenge() {
@@ -1467,7 +1518,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const deck = getDeck(storage, $('#setup-deck').value);
     if (!deck) { toast('Pick a deck'); return; }
     const players = getSetupPlayers();
-    if (deck.songs.length < players.length + 1) {
+    if (availableSongs(deck.songs).length < players.length + 1) {
       toast(`"${deck.name}" needs at least ${players.length + 1} songs for ${players.length} players.`);
       return;
     }
@@ -1507,4 +1558,30 @@ window.__hitster = {
   get previewState() { return previewState; },
   prefetch: (n) => prefetchUpcoming(n),
   refill: () => refillDeck(),
+};
+
+// Concise, answer-safe state for browser automation and accessibility checks.
+// The mystery year stays hidden until a hint is bought or the card is revealed.
+window.render_game_to_text = () => {
+  const screen = [...document.querySelectorAll('[data-screen]')]
+    .find((node) => !node.classList.contains('hidden'))?.dataset.screen || 'unknown';
+  if (!game) return JSON.stringify({ screen, mode: 'menu' });
+  const active = game.players[game.current];
+  const revealed = game.phase === 'reveal' ? lastRevealCard() : null;
+  return JSON.stringify({
+    screen,
+    mode: game.phase,
+    activePlayer: active.name,
+    tokens: active.tokens,
+    timeline: active.timeline.map((c) => ({ year: c.year, title: c.title, artist: c.artist })),
+    mystery: revealed
+      ? { year: revealed.year, title: revealed.title, artist: revealed.artist }
+      : {
+          preview: previewState,
+          hint: game.hintUsed ? `${Math.floor(game.mystery.year / 10) * 10}s` : null,
+        },
+    selectedSlot,
+    challenges: game.challenges.map((c) => ({ player: game.players[c.player].name, slot: c.slot })),
+    differentYearSongsAvailable: drawableCount(game),
+  });
 };

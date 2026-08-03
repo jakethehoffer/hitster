@@ -67,6 +67,46 @@ await page.evaluateOnNewDocument(() => {
 
 await page.goto(`http://localhost:${port}/`, { waitUntil: 'networkidle0' });
 
+// The real first-run seed includes the complete Eminem catalogue. Verify the
+// storage split and the archive-only editor treatment before replacing the
+// built-ins with the small deterministic deck used by the long game smoke.
+const eminemSeed = await page.evaluate(() => {
+  const ids = JSON.parse(localStorage.getItem('hitster.deckIndex') || '[]');
+  const decks = ids.map((id) => JSON.parse(localStorage.getItem(`hitster.deck.${id}`) || 'null'));
+  const deck = decks.find((d) => d && d.seedKey === 'eminem-name-that-tune');
+  if (!deck) return { error: 'missing built-in deck' };
+  document.querySelector('#btn-decks').click();
+  const row = [...document.querySelectorAll('#deck-list .deck-item')]
+    .find((n) => n.textContent.includes('Name That Tune: Eminem'));
+  if (!row) return { error: 'missing deck-list row' };
+  const meta = row.querySelector('.deck-meta')?.textContent || '';
+  [...row.querySelectorAll('button')].find((b) => b.textContent === 'Edit')?.click();
+  const filter = document.querySelector('#deck-filter');
+  filter.value = 'Marshall Powers';
+  filter.dispatchEvent(new Event('input'));
+  const archiveRow = document.querySelector('#deck-songs .song-item');
+  return {
+    total: deck.songs.length,
+    playable: deck.songs.filter((s) => !s.previewUnavailable).length,
+    archive: deck.songs.filter((s) => s.previewUnavailable).length,
+    meta,
+    archiveTitle: archiveRow?.querySelector('.song-title')?.textContent || '',
+    archiveBadge: archiveRow?.querySelector('.catalog-badge')?.textContent || '',
+    archiveHasAutoLookup: [...(archiveRow?.querySelectorAll('button') || [])]
+      .some((b) => b.textContent.includes('Fix preview')),
+  };
+});
+if (eminemSeed.total !== 772 || eminemSeed.playable !== 514 || eminemSeed.archive !== 258) {
+  errors.push(`Eminem seed counts: ${JSON.stringify(eminemSeed)}`);
+} else if (!eminemSeed.meta.includes('514 playable')
+  || eminemSeed.archiveTitle !== 'Marshall Powers'
+  || !eminemSeed.archiveBadge.includes('unreleased')
+  || eminemSeed.archiveHasAutoLookup) {
+  errors.push(`Eminem archive UI: ${JSON.stringify(eminemSeed)}`);
+} else {
+  console.log('  ✔ Eminem catalogue: 514 playable + 258 archive-only, correctly labelled');
+}
+
 // Install a deterministic test deck (with fake previews so no iTunes calls),
 // and mark the seed as installed so only the test deck exists.
 await page.evaluate((seeds) => {
@@ -131,6 +171,46 @@ while (turns < 80 && !won) {
   // The lock button is deliberately withheld while the preview is resolving,
   // so wait for that to settle instead of racing however many lookups it takes.
   await page.waitForFunction(() => window.__hitster.previewState !== 'loading', { timeout: 30000 });
+  const repeatedYear = await page.evaluate(() => {
+    const g = window.__hitster.game;
+    return g.players[g.current].timeline.some((c) => c.year === g.mystery.year);
+  });
+  if (repeatedYear) errors.push(`turn ${turns}: mystery repeated a timeline year`);
+  // A paid hint reveals the decade once, spends exactly one token, and never
+  // exposes the exact year in the automation/public state.
+  if (turns === 1) {
+    const before = await page.evaluate(() => {
+      const g = window.__hitster.game;
+      return { tokens: g.players[g.current].tokens, year: g.mystery.year };
+    });
+    if (!(await clickText('💡 Hint'))) {
+      errors.push('no hint button in listening phase');
+    } else {
+      const hinted = await page.evaluate(() => {
+        const g = window.__hitster.game;
+        const textState = JSON.parse(window.render_game_to_text());
+        return {
+          tokens: g.players[g.current].tokens,
+          text: document.querySelector('.song-hint')?.textContent || '',
+          hintButton: [...document.querySelectorAll('button')]
+            .some((b) => b.offsetParent !== null && b.textContent.includes('💡 Hint')),
+          publicMystery: textState.mystery,
+        };
+      });
+      const decade = `${Math.floor(before.year / 10) * 10}s`;
+      if (hinted.tokens !== before.tokens - 1) errors.push('hint did not spend exactly one token');
+      if (!hinted.text.includes(decade)) errors.push('hint did not show the mystery decade');
+      if (hinted.hintButton) errors.push('hint could be bought twice for one song');
+      if (hinted.publicMystery.hint !== decade || 'year' in hinted.publicMystery) {
+        errors.push('text state leaked the exact mystery year or missed the paid hint');
+      } else {
+        console.log('  ✔ hint spent one token and revealed only the decade');
+      }
+      if (process.env.HITSTER_HINT_SCREENSHOT) {
+        await page.screenshot({ path: process.env.HITSTER_HINT_SCREENSHOT, fullPage: true });
+      }
+    }
+  }
   // spacebar toggles playback during a turn (must not crash or scroll away)
   if (turns === 1) await page.keyboard.press('Space');
   // Cutting a song mid-listen rejects it AND moves on, for free — so it must

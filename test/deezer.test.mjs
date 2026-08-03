@@ -15,7 +15,16 @@ test('deezerTrackToCard maps Deezer fields to the Card shape', () => {
   assert.equal(card.artist, 'Kendrick Lamar');
   assert.equal(card.previewUrl, 'https://cdn-preview.dzcdn.net/x.mp3');
   assert.equal(card.artworkUrl, 'https://cdn-images.dzcdn.net/cover.jpg');
+  assert.equal(card.albumTitle, undefined);
   assert.equal(card.explicit, true);
+});
+
+test('deezerTrackToCard keeps album metadata used to reject hidden live cuts', () => {
+  const card = deezerTrackToCard({
+    title: "Hips Don't Lie", artist: { name: 'Shakira' }, preview: 'p',
+    album: { title: 'Anniversary | Oral Fixation LIVE' },
+  });
+  assert.equal(card.albumTitle, 'Anniversary | Oral Fixation LIVE');
 });
 
 test('deezerTrackToCard leaves explicit undefined for clean tracks', () => {

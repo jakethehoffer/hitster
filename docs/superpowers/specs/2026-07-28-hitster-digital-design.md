@@ -33,6 +33,8 @@ scope — possible later on Cloudflare Durable Objects without changing the engi
   slots. Replay the 30-sec preview freely.
 - **Skip:** the active player may spend 1 token to discard the mystery song and
   draw a new one.
+- **Hint (added 2026-08-02):** during placement, the active player may spend 1
+  token once per mystery song to reveal its decade. A redraw gets a fresh hint.
 - **Challenge (optional, default on):** after the active player locks a slot,
   any other player may spend 1 token to claim a *different* slot in the active
   player's timeline. Multiple challengers allowed; each must pick a distinct slot.
@@ -55,7 +57,8 @@ scope — possible later on Cloudflare Durable Objects without changing the engi
   active player's timeline and draws randomly among cards within 7 years of
   one; when nothing is that close it takes the closest 3 available. Uses a
   serializable PRNG in game state so save/resume stays consistent. Toggle in
-  setup; off restores plain top-of-pile draws.
+  setup; off restores plain top-of-pile draws. In either mode, a song whose
+  year already appears on the active timeline is never eligible to draw.
 - **Endless deck (added 2026-07-31, default on):** when the draw pile drops
   below 6 cards, the app discovers up to 5 new songs by artists already in the
   deck via Deezer artist search, filtering alternate cuts and compilation

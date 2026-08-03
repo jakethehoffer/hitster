@@ -5,6 +5,8 @@
 // Bumping a deck's `version` after adding songs makes ensureSeedDecks top up
 // already-installed copies (new songs appended, user edits/ratings preserved).
 
+import { EMINEM_SONGS } from './eminem-deck.js';
+
 const STARTER_SONGS = [
   { title: 'Good Vibrations', artist: 'The Beach Boys', year: 1966 },
   { title: 'Respect', artist: 'Aretha Franklin', year: 1967 },
@@ -350,4 +352,5 @@ export const SEED_DECKS = [
   { key: 'rock', version: 1, name: 'Rock Anthems', songs: ROCK_SONGS },
   { key: 'rnb', version: 1, name: 'R&B & Soul', songs: RNB_SONGS },
   { key: 'throwbacks', version: 1, name: '2000s & 2010s Throwbacks', songs: THROWBACK_SONGS },
+  { key: 'eminem-name-that-tune', version: 1, name: 'Name That Tune: Eminem — Complete Catalog', songs: EMINEM_SONGS },
 ];

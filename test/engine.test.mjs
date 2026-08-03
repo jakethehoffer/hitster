@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGame, startTurn, skipSong, freeSkip, placeCard, addChallenge,
-  resolveTurn, awardBonus, nextTurn, isSlotCorrect, pickHardIndex, insertIntoTimeline, drawableCount,
+  resolveTurn, awardBonus, nextTurn, isSlotCorrect, pickHardIndex, insertIntoTimeline, drawableCount, buyHint,
 } from '../js/engine.js';
 
 const card = (year, title = `song-${year}`) => ({ title, artist: 'artist', year });
@@ -80,6 +80,10 @@ test('createGame rejects bad player counts and undersized decks', () => {
   assert.throws(() => createGame({ players: ['solo'], deck: makeDeck(20) }));
   assert.throws(() => createGame({ players: Array.from({ length: 9 }, (_, i) => `p${i}`), deck: makeDeck(30) }));
   assert.throws(() => createGame({ players: ['a', 'b'], deck: makeDeck(2) }));
+  assert.throws(() => createGame({
+    players: ['a', 'b'],
+    deck: [card(2000, 'a'), card(2000, 'b'), card(2000, 'c')],
+  }), /different years/i);
 });
 
 // --- isSlotCorrect ---
@@ -158,6 +162,27 @@ test('startTurn draws a mystery card and enters listening', () => {
   assert.throws(() => startTurn(s)); // wrong phase
 });
 
+test('hard draws exclude an exact timeline-year match even though it is closest', () => {
+  const s = freshGame({ hardDraws: true });
+  s.players[0].timeline = [card(2000)];
+  s.drawPile = [card(1980), card(1997), card(2000, 'blocked-exact-match')];
+  startTurn(s);
+  assert.equal(s.mystery.year, 1997);
+  assert.ok(s.drawPile.some((c) => c.title === 'blocked-exact-match'));
+});
+
+test('draws and redraws never use a year already on the active timeline', () => {
+  const s = freshGame({ hardDraws: false });
+  s.players[0].timeline = [card(1990), card(2000)];
+  s.drawPile = [card(1980), card(1990, 'same-1990'), card(2010), card(2000, 'same-2000')];
+  startTurn(s);
+  assert.equal(s.mystery.year, 2010, 'plain top-of-pile draw must pass the blocked 2000 card');
+  freeSkip(s);
+  assert.equal(s.mystery.year, 1980, 'redraw must pass the remaining blocked 1990 card');
+  assert.deepEqual(s.drawPile.map((c) => c.year), [1990, 2000]);
+  assert.equal(drawableCount(s), 0);
+});
+
 test('skipSong costs a token, discards, and redraws; throws at zero tokens', () => {
   const s = freshGame();
   startTurn(s);
@@ -177,6 +202,20 @@ test('freeSkip redraws without spending a token', () => {
   freeSkip(s);
   assert.equal(s.players[0].tokens, 2);
   assert.equal(s.phase, 'listening');
+});
+
+test('a hint costs one token, is limited to once per song, and resets on redraw', () => {
+  const s = freshGame();
+  startTurn(s);
+  buyHint(s);
+  assert.equal(s.players[0].tokens, 1);
+  assert.equal(s.hintUsed, true);
+  assert.throws(() => buyHint(s), /already/i);
+  freeSkip(s);
+  assert.equal(s.hintUsed, false);
+  buyHint(s);
+  assert.equal(s.players[0].tokens, 0);
+  assert.throws(() => buyHint(s), /No tokens/i);
 });
 
 test('placeCard records the slot and opens the challenge phase', () => {
@@ -396,6 +435,17 @@ test('nextTurn advances and wraps the active player', () => {
   assert.equal(s.phase, 'idle');
   startTurn(s); placeCard(s, 0); resolveTurn(s); nextTurn(s);
   assert.equal(s.current, 0);
+});
+
+test('nextTurn skips a player when every remaining song repeats their timeline years', () => {
+  const s = createGame({ players: ['A', 'B', 'C'], deck: makeDeck(10), rngSeed: 3 });
+  startTurn(s); placeCard(s, 0); resolveTurn(s);
+  s.players[1].timeline = [card(1990)];
+  s.players[2].timeline = [card(1980)];
+  s.drawPile = [card(1990)];
+  nextTurn(s);
+  assert.equal(s.phase, 'idle');
+  assert.equal(s.current, 2, 'B cannot use 1990, so play passes to C');
 });
 
 test('nextTurn declares a winner at cardsToWin', () => {
