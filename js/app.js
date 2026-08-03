@@ -988,20 +988,20 @@ function renderPhase() {
 }
 
 const CLUE_TITLES = {
-  title: 'Reveals the shape of the title — first letters only, never the year',
-  artist: 'Reveals the shape of the artist name — first letters only',
-  cover: 'Shows the album sleeve, blurred',
+  title: 'Names the song outright — never the year',
+  artist: 'Names the artist outright',
+  cover: 'Shows the album sleeve',
 };
 
 function clueNode(clue) {
   if (clue.image) {
     return el('div', { class: 'clue clue-cover' },
-      el('img', { src: clue.image, alt: 'Blurred album cover' }),
+      el('img', { src: clue.image, alt: 'Album cover' }),
       el('span', { class: 'clue-note', text: 'cover' }));
   }
   return el('div', { class: 'clue' },
-    el('span', { class: 'clue-masked', text: clue.text }),
-    el('span', { class: 'clue-note', text: `${clue.kind}, ${clue.note}` }));
+    el('span', { class: 'clue-text', text: clue.text }),
+    el('span', { class: 'clue-note', text: clue.kind }));
 }
 
 // 👍/👎 for the current song — available while it plays (before you know what

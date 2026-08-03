@@ -44,12 +44,12 @@ Same as real Hitster:
    placements are always a genuine call, never a gimme decades outside your
    range. A mystery song never shares a year with a card already on the active
    player's timeline.
-   Stuck? Buy a **clue** for 1 token each: **🔤 Title** and **🎤 Artist**
-   show the shape of the words (first letters only, digits masked), and
-   **💿 Cover** shows the sleeve, blurred. No clue ever states or implies the
-   year — that is the question the game is asking, so the answer is never for
-   sale. Each clue is sold once per song, so a really stuck player can buy a
-   different angle instead of the same one twice.
+   Stuck? Buy a **clue** for 1 token each: **🔤 Title** names the song,
+   **🎤 Artist** names the artist, and **💿 Cover** shows the sleeve. No clue
+   ever states or implies the year — that is the question the game is asking,
+   so the answer itself is never for sale, and knowing what a song is only
+   helps if you know when it came out. Each clue is sold once per song, so a
+   really stuck player can buy a different angle instead of the same one twice.
 3. Tap the slot in your timeline where you think the song belongs
    (before/between/after your cards), then press **Lock it in**.
 4. Anyone else who thinks you're wrong can **challenge** for 1 token: tap

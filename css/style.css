@@ -210,24 +210,23 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
   gap: .4rem; flex-wrap: wrap;
 }
 .clue-row .label { color: var(--ink-dim); font-size: .85rem; }
-.clue-strip { display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; }
+.clue-strip { display: flex; gap: .5rem; justify-content: center; align-items: stretch; flex-wrap: wrap; }
 .clue {
-  display: flex; flex-direction: column; align-items: center;
-  padding: .25rem .6rem;
-  background: rgba(251,191,36,.09); border: 1px solid rgba(251,191,36,.35);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: .4rem .9rem;
+  background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.4);
   border-radius: var(--radius);
 }
-.clue-masked {
-  color: var(--gold); font-weight: 800; letter-spacing: .1em;
-  font-family: "Consolas", "SF Mono", ui-monospace, monospace;
-  /* underscores hang low — without the extra leading they touch the note */
-  font-size: 1rem; line-height: 1.5; white-space: nowrap;
+.clue-text {
+  color: var(--gold); font-weight: 800;
+  font-size: 1.45rem; line-height: 1.25;
+  max-width: 22rem; text-align: center;
 }
-.clue-note { color: var(--ink-dim); font-size: .68rem; letter-spacing: .04em; line-height: 1.2; }
-.clue-cover { padding: .25rem .35rem; }
+.clue-note { color: var(--ink-dim); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
+.clue-cover { padding: .35rem; }
 .clue-cover img {
-  width: 2.6rem; height: 2.6rem; border-radius: 8px; object-fit: cover;
-  filter: blur(5px) saturate(1.3); transform: scale(.94);
+  width: 5.5rem; height: 5.5rem; border-radius: 10px; object-fit: cover;
+  display: block;
 }
 
 .phase-controls { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem; }
@@ -434,9 +433,11 @@ body.in-game .deck-stage.compact {
   width: auto;
   height: min(clamp(4.5rem, 12vh, 8rem), 44vw);
 }
-body.in-game .clue { padding: .2rem .5rem; }
-body.in-game .clue-cover img { width: clamp(2rem, 5.5vh, 2.6rem); height: clamp(2rem, 5.5vh, 2.6rem); }
-body.in-game .clue-masked { font-size: clamp(.75rem, 2vh, 1rem); letter-spacing: .07em; }
+body.in-game .clue { padding: .3rem .7rem; }
+body.in-game .clue-cover img {
+  width: clamp(3.2rem, 9vh, 5.5rem); height: clamp(3.2rem, 9vh, 5.5rem);
+}
+body.in-game .clue-text { font-size: clamp(1rem, 3vh, 1.45rem); }
 body.in-game .btn-big { padding: .65rem 1.6rem; }
 body.in-game .challenge-picker + .phase-sub + .phase-controls { margin: 0; padding: .45rem; }
 body.in-game .challenge-picker { margin: 0; }

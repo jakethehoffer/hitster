@@ -193,9 +193,8 @@ while (turns < 80 && !won) {
     return g.players[g.current].timeline.some((c) => c.year === g.mystery.year);
   });
   if (repeatedYear) errors.push(`turn ${turns}: mystery repeated a timeline year`);
-  // A clue costs exactly one token, shows the shape of the title rather than
-  // the title, sells each angle only once, and never states the year anywhere —
-  // not on screen and not in the automation state.
+  // A clue costs exactly one token, names the song outright, sells each angle
+  // only once, and never puts the year into the automation state.
   if (turns === 1) {
     const before = await page.evaluate(() => {
       const g = window.__hitster.game;
@@ -208,19 +207,21 @@ while (turns < 80 && !won) {
         const g = window.__hitster.game;
         const buttons = [...document.querySelectorAll('button')]
           .filter((b) => b.offsetParent !== null).map((b) => b.textContent);
+        const chip = document.querySelector('.clue');
         return {
           tokens: g.players[g.current].tokens,
-          shown: [...document.querySelectorAll('.clue-masked')].map((n) => n.textContent),
+          shown: [...document.querySelectorAll('.clue-text')].map((n) => n.textContent),
+          chipHeight: chip ? Math.round(chip.getBoundingClientRect().height) : 0,
+          fontPx: chip ? parseFloat(getComputedStyle(chip.querySelector('.clue-text')).fontSize) : 0,
           titleStillForSale: buttons.some((t) => t.includes('🔤 Title')),
           artistStillForSale: buttons.some((t) => t.includes('🎤 Artist')),
           publicMystery: JSON.parse(window.render_game_to_text()).mystery,
         };
       });
-      const masked = clued.shown.join(' ');
       if (clued.tokens !== before.tokens - 1) errors.push('a clue did not spend exactly one token');
       if (clued.shown.length !== 1) errors.push('the title clue did not appear');
-      if (masked.includes(before.title)) errors.push('the clue printed the title outright');
-      if (/\d/.test(masked)) errors.push('the clue exposed a digit');
+      if (clued.shown[0] !== before.title) errors.push(`the clue showed "${clued.shown[0]}" instead of the title`);
+      if (clued.fontPx < 14) errors.push(`the clue is too small to read across a room (${clued.fontPx}px)`);
       if (clued.titleStillForSale) errors.push('the same clue could be bought twice');
       if (!clued.artistStillForSale) errors.push('buying one clue withdrew the others');
       if (String(clued.publicMystery.year ?? '').length > 0
@@ -229,7 +230,7 @@ while (turns < 80 && !won) {
       } else if (!clued.publicMystery.clues.includes('title')) {
         errors.push('text state did not record the bought clue');
       } else {
-        console.log('  ✔ a clue spent one token, masked the title and leaked no year');
+        console.log(`  ✔ a clue spent one token, named the song at ${clued.fontPx}px and leaked no year`);
       }
       if (process.env.HITSTER_HINT_SCREENSHOT) {
         await page.screenshot({ path: process.env.HITSTER_HINT_SCREENSHOT, fullPage: true });
