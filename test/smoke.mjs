@@ -107,6 +107,46 @@ if (eminemSeed.total !== 772 || eminemSeed.playable !== 514 || eminemSeed.archiv
   console.log('  ✔ Eminem catalogue: 514 playable + 258 archive-only, correctly labelled');
 }
 
+// The Kanye catalogue is mostly leaks by count, so the split is what matters:
+// a scrapped-album track must be visible in the editor and flagged, never
+// offered a preview lookup that cannot succeed.
+const kanyeSeed = await page.evaluate(() => {
+  const ids = JSON.parse(localStorage.getItem('hitster.deckIndex') || '[]');
+  const decks = ids.map((id) => JSON.parse(localStorage.getItem(`hitster.deck.${id}`) || 'null'));
+  const deck = decks.find((d) => d && d.seedKey === 'kanye-name-that-tune');
+  if (!deck) return { error: 'missing built-in deck' };
+  document.querySelector('#btn-decks').click();
+  const row = [...document.querySelectorAll('#deck-list .deck-item')]
+    .find((n) => n.textContent.includes('Name That Tune: Kanye West'));
+  if (!row) return { error: 'missing deck-list row' };
+  const meta = row.querySelector('.deck-meta')?.textContent || '';
+  [...row.querySelectorAll('button')].find((b) => b.textContent === 'Edit')?.click();
+  const filter = document.querySelector('#deck-filter');
+  filter.value = 'Chakras';
+  filter.dispatchEvent(new Event('input'));
+  const archiveRow = document.querySelector('#deck-songs .song-item');
+  return {
+    total: deck.songs.length,
+    playable: deck.songs.filter((s) => !s.previewUnavailable).length,
+    archive: deck.songs.filter((s) => s.previewUnavailable).length,
+    meta,
+    archiveTitle: archiveRow?.querySelector('.song-title')?.textContent || '',
+    archiveBadge: archiveRow?.querySelector('.catalog-badge')?.textContent || '',
+    archiveHasAutoLookup: [...(archiveRow?.querySelectorAll('button') || [])]
+      .some((b) => b.textContent.includes('Fix preview')),
+  };
+});
+if (kanyeSeed.total !== 960 || kanyeSeed.playable !== 526 || kanyeSeed.archive !== 434) {
+  errors.push(`Kanye seed counts: ${JSON.stringify(kanyeSeed)}`);
+} else if (!kanyeSeed.meta.includes('526 playable')
+  || kanyeSeed.archiveTitle !== 'Chakras'
+  || !kanyeSeed.archiveBadge.includes('unreleased')
+  || kanyeSeed.archiveHasAutoLookup) {
+  errors.push(`Kanye archive UI: ${JSON.stringify(kanyeSeed)}`);
+} else {
+  console.log('  ✔ Kanye catalogue: 526 playable + 434 archive-only, correctly labelled');
+}
+
 // The century deck has to actually span a century, or it is just another
 // decades deck with an ambitious name.
 const billboard = await page.evaluate(() => {

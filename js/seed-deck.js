@@ -7,6 +7,7 @@
 
 import { EMINEM_SONGS } from './eminem-deck.js';
 import { BILLBOARD_SONGS } from './billboard-deck.js';
+import { KANYE_SONGS } from './kanye-deck.js';
 
 const STARTER_SONGS = [
   { title: 'Good Vibrations', artist: 'The Beach Boys', year: 1966 },
@@ -355,4 +356,5 @@ export const SEED_DECKS = [
   { key: 'throwbacks', version: 1, name: '2000s & 2010s Throwbacks', songs: THROWBACK_SONGS },
   { key: 'eminem-name-that-tune', version: 1, name: 'Name That Tune: Eminem — Complete Catalog', songs: EMINEM_SONGS },
   { key: 'billboard-century', version: 1, name: 'Billboard Hits: 100 Years (1926–2024)', songs: BILLBOARD_SONGS },
+  { key: 'kanye-name-that-tune', version: 1, name: 'Name That Tune: Kanye West — Complete Catalog', songs: KANYE_SONGS },
 ];

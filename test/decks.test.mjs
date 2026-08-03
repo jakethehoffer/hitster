@@ -158,6 +158,38 @@ test('Name That Tune: Eminem contains the complete reviewed song catalogue', () 
     && s.catalogStatus === 'unreleased' && s.previewUnavailable));
 });
 
+test('Name That Tune: Kanye West contains the complete reviewed song catalogue', () => {
+  const seed = SEED_DECKS.find((d) => d.key === 'kanye-name-that-tune');
+  assert.ok(seed, 'missing Kanye deck');
+  assert.equal(seed.songs.length, 960);
+  assert.equal(availableSongs(seed.songs).length, 526);
+  assert.equal(unavailableCount(seed.songs), 434);
+  assert.ok(seed.songs.some((s) => s.title === 'Through the Wire' && s.year === 2004));
+  assert.ok(seed.songs.some((s) => s.title === 'Runaway' && s.year === 2010));
+  assert.ok(seed.songs.some((s) => s.title === 'Carnival' && s.year === 2024));
+  // guest verses count: the deck is his catalogue, not just his own records
+  assert.ok(seed.songs.some((s) => s.title === 'American Boy' && s.artist === 'Estelle'));
+  assert.ok(seed.songs.some((s) => s.catalogStatus === 'unreleased' && s.previewUnavailable));
+  assert.ok(seed.songs.some((s) => s.catalogStatus === 'archive' && s.previewUnavailable));
+});
+
+// A guest verse and the album cut of the same recording must never both be
+// drawable, or one tune has two right answers — that is how "Slow Jamz" would
+// land as both Twista 2003 and Kanye 2004. Different songs are allowed to share
+// a name, so the guard is a reviewed allow-list: any new repeat fails here and
+// has to be checked by hand. Archive records are exempt, never being drawn.
+test('the only Kanye titles drawn twice are the reviewed different-song pairs', () => {
+  const seed = SEED_DECKS.find((d) => d.key === 'kanye-name-that-tune');
+  const reviewed = new Set(['530', 'higher', 'forever', 'ultralightbeam', 'burneverything', 'king']);
+  const groups = new Map();
+  for (const s of availableSongs(seed.songs)) {
+    const k = s.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+    groups.set(k, (groups.get(k) || 0) + 1);
+  }
+  const repeated = [...groups].filter(([, n]) => n > 1).map(([k]) => k);
+  assert.deepEqual(repeated.sort(), [...reviewed].sort());
+});
+
 test('archive-only recordings stay catalogued but never enter a game pool', () => {
   const songs = [
     { title: 'Released', artist: 'x', year: 2000 },

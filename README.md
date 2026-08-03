@@ -134,11 +134,12 @@ on the home screen picks up where you left off.
 `.hitster.json` file, send it to a friend, and they click **⇪ Import JSON** on
 their Decks screen. Decks live in each browser's localStorage.
 
-Eight built-in decks are included, each big enough for a game to 10 cards:
+Nine built-in decks are included, each big enough for a game to 10 cards:
 the **Starter deck** (61 hits, 1966–2024), **Rap & Hip-Hop** (61, 1979–2024),
 **Pop Through the Decades** (61, 1963–2024), **Rock Anthems** (50, 1965–2020),
-**R&B & Soul** (45, 1961–2023), **2000s & 2010s Throwbacks** (42), and
+**R&B & Soul** (45, 1961–2023), **2000s & 2010s Throwbacks** (42),
 **Name That Tune: Eminem — Complete Catalog** (772 song recordings, 1988–2025),
+**Name That Tune: Kanye West — Complete Catalog** (960 recordings, 1996–2026),
 and **Billboard Hits: 100 Years** (257 songs, 1926–2024).
 They're normal decks — edit, prune with 👎 votes, or delete them. When an
 update adds songs to a built-in deck, your copy gets the new songs on next
@@ -159,6 +160,16 @@ editor, but they are not dealt automatically because Deezer and iTunes do not
 provide authorised previews for them. Selecting an exact legal preview through
 the editor makes that entry playable. Spoken skits/interludes and project-title
 placeholders are not counted as songs.
+
+The Kanye deck follows the same split: 526 released recordings against 434
+archive entries — early Chicago demos, the Freshmen Adjustment and Go-Getters
+tapes, and leaks from the scrapped album eras (Good Ass Job, So Help Me God,
+Turbo Grafx 16, Yandhi, and the Donda and Vultures leftovers). Released tracks
+are songs he performs on, whether he leads or guests; songs he only produced
+are left out, but projects he authored — Cruel Summer and Jesus Is Born — are
+carried whole. Only the released side is deduplicated on title, because only it
+can be drawn and two cards must never share a tune; six same-title pairs survive
+as reviewed exceptions where the songs are genuinely different.
 
 Previews resolve to the original recording: the lookup asks Deezer by artist
 and track field (free-text search sometimes buries the real single under
