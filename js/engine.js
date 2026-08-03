@@ -39,9 +39,11 @@ export function createGame({
   }
   const rng = mulberry32(rngSeed);
   const drawPile = shuffled(deck, rng);
+  const baseCard = drawPile.pop();
+  baseCard.plays = (baseCard.plays || 0) + 1;
   const playerStates = players.map((name) => ({
     name,
-    timeline: [drawPile.pop()],
+    timeline: [{ ...baseCard }],
     tokens: startTokens,
   }));
   return {

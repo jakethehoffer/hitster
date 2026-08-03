@@ -22,16 +22,47 @@ function freshGame(overrides = {}) {
 
 // --- createGame ---
 
-test('createGame deals one starting card per player and shuffles rest into drawPile', () => {
+test('createGame gives every player the same shared starting song', () => {
   const s = freshGame();
+  const baseCard = s.players[0].timeline[0];
   assert.equal(s.players.length, 2);
   for (const p of s.players) {
     assert.equal(p.timeline.length, 1);
+    assert.deepEqual(p.timeline[0], baseCard);
     assert.equal(p.tokens, 2);
   }
-  assert.equal(s.drawPile.length, 23);
+  assert.equal(baseCard.plays, 1);
+  assert.equal(s.drawPile.length, 24);
   assert.equal(s.phase, 'idle');
   assert.equal(s.mystery, null);
+});
+
+test('the shared starting song is never dealt as a mystery', () => {
+  const s = freshGame({ hardDraws: false });
+  const baseTitle = s.players[0].timeline[0].title;
+  const mysteryTitles = [];
+
+  while (drawableCount(s) > 0) {
+    startTurn(s);
+    mysteryTitles.push(s.mystery.title);
+    // Isolate drawing behavior so every drawable card can be inspected without
+    // ending the game through normal turn resolution.
+    s.phase = 'idle';
+    s.mystery = null;
+  }
+
+  assert.equal(mysteryTitles.length, 24);
+  assert.ok(!mysteryTitles.includes(baseTitle));
+});
+
+test('each player receives an independent clone of the shared starting song', () => {
+  const s = freshGame();
+  const annBase = s.players[0].timeline[0];
+  const benBase = s.players[1].timeline[0];
+
+  assert.notStrictEqual(annBase, benBase);
+  annBase.title = 'changed for Ann';
+  assert.notEqual(benBase.title, annBase.title);
 });
 
 test('createGame is deterministic for the same seed', () => {
@@ -123,7 +154,7 @@ test('startTurn draws a mystery card and enters listening', () => {
   startTurn(s);
   assert.equal(s.phase, 'listening');
   assert.ok(s.mystery);
-  assert.equal(s.drawPile.length, 22);
+  assert.equal(s.drawPile.length, 23);
   assert.throws(() => startTurn(s)); // wrong phase
 });
 

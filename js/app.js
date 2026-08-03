@@ -595,6 +595,7 @@ let game = null;
 let gameDeckId = null;
 let selectedSlot = null;          // tentative slot during listening
 let selectedChallenger = null;    // player idx picking a challenge slot
+let selectedChallengeSlot = null; // tentative slot awaiting challenge confirmation
 let bonusAwarded = new Set();
 let songVoted = { up: false, down: false }; // one 👍 and one 👎 per reveal
 let previewState = 'idle';        // idle | loading | ready | error
@@ -755,12 +756,21 @@ function renderPhase() {
         picker.append(el('button', {
           class: `btn${selectedChallenger === i ? ' picked' : ''}`,
           text: pl.name,
-          onclick: () => { selectedChallenger = selectedChallenger === i ? null : i; renderGame(); },
+          onclick: () => {
+            selectedChallenger = selectedChallenger === i ? null : i;
+            selectedChallengeSlot = null;
+            renderGame();
+          },
         }));
       }
       area.append(picker);
       if (selectedChallenger != null) {
         area.append(el('p', { class: 'phase-sub', text: `${game.players[selectedChallenger].name}: tap the slot you think is right.` }));
+        if (selectedChallengeSlot != null) {
+          area.append(el('div', { class: 'phase-controls' },
+            el('button', { class: 'btn btn-primary btn-big', text: 'Confirm challenge', onclick: onConfirmChallenge }),
+            el('button', { class: 'btn', text: 'Cancel', onclick: onCancelChallenge })));
+        }
       }
     }
     if (game.challenges.length > 0) {
@@ -866,6 +876,14 @@ function dayAndMonth(released) {
   return month ? `${parseInt(d, 10)} ${month}` : null;
 }
 
+// "2015-10-23" -> "Oct 23, 2015" without applying a timezone offset.
+function fullReleaseDate(released) {
+  const [year, m, d] = (released || '').split('-');
+  const month = MONTHS[parseInt(m, 10) - 1];
+  const day = parseInt(d, 10);
+  return year && month && Number.isInteger(day) ? `${month} ${day}, ${year}` : null;
+}
+
 function revealCardNode(card) {
   // The date is what decides a placement against a song from the same year,
   // so show it — otherwise losing one of those looks arbitrary.
@@ -901,7 +919,8 @@ function renderTimeline() {
   const slotNode = (slotIdx) => {
     const isPlaced = game.phase !== 'listening' && game.placedSlot === slotIdx;
     const challenge = game.challenges.find((c) => c.slot === slotIdx);
-    const isSelected = game.phase === 'listening' && selectedSlot === slotIdx;
+    const isSelected = (game.phase === 'listening' && selectedSlot === slotIdx)
+      || (game.phase === 'challenge' && selectedChallengeSlot === slotIdx);
     const taken = isPlaced || challenge;
     const btn = el('button', {
       class: `slot${isSelected || isPlaced ? ' selected' : ''}${challenge ? ' challenged' : ''}`,
@@ -912,12 +931,8 @@ function renderTimeline() {
           selectedSlot = slotIdx;
           renderGame();
         } else {
-          try {
-            addChallenge(game, selectedChallenger, slotIdx);
-            selectedChallenger = null;
-            saveGame();
-            renderGame();
-          } catch (err) { toast(err.message); }
+          selectedChallengeSlot = selectedChallengeSlot === slotIdx ? null : slotIdx;
+          renderGame();
         }
       },
     });
@@ -940,8 +955,10 @@ function renderTimeline() {
 }
 
 function timelineCardNode(card, highlight) {
+  const released = fullReleaseDate(card.released);
   return el('div', { class: `timeline-card${highlight ? ' just-won' : ''}` },
     el('div', { class: 'tc-year', text: String(card.year) }),
+    released ? el('div', { class: 'tc-date', text: released }) : null,
     el('div', { class: 'tc-title', text: card.title }),
     el('div', { class: 'tc-artist', text: card.artist }));
 }
@@ -1153,6 +1170,18 @@ function cachePreviewToDeck(card) {
 // Never awaited by the turn — a missing date just leaves the placement free.
 const dateLookups = new Set();
 
+function applyReleaseDate(card, released) {
+  card.released = released;
+  if (!game) return;
+  for (const player of game.players) {
+    for (const timelineCard of player.timeline) {
+      if (timelineCard.title === card.title && timelineCard.artist === card.artist) {
+        timelineCard.released = released;
+      }
+    }
+  }
+}
+
 function warmReleaseDate(card) {
   if (!card || card.released !== undefined) return;
   const key = `${card.title}|${card.artist}`;
@@ -1162,16 +1191,18 @@ function warmReleaseDate(card) {
   const deck = gameDeckId ? getDeck(storage, gameDeckId) : null;
   const known = deck && deck.songs.find((s) => s.title === card.title && s.artist === card.artist);
   if (known && known.released !== undefined) {
-    card.released = known.released;
+    applyReleaseDate(card, known.released);
     saveGame();
+    renderTimeline();
     return;
   }
   dateLookups.add(key);
   resolveReleaseDate(card)
     .then((released) => {
       // null is a real answer: store it so we don't ask again every game
-      card.released = released;
+      applyReleaseDate(card, released);
       saveGame();
+      renderTimeline();
       const d = gameDeckId ? getDeck(storage, gameDeckId) : null;
       const song = d && d.songs.find((s) => s.title === card.title && s.artist === card.artist);
       if (!song) return;
@@ -1192,6 +1223,7 @@ function onStartTurn() {
   stopAudio();
   selectedSlot = null;
   selectedChallenger = null;
+  selectedChallengeSlot = null;
   bonusAwarded = new Set();
   songVoted = { up: false, down: false };
   mysteryRetried = false;
@@ -1228,6 +1260,7 @@ function onLockPlacement() {
   if (selectedSlot == null) return;
   placeCard(game, selectedSlot);
   selectedSlot = null;
+  selectedChallengeSlot = null;
   // If nobody can challenge, resolve straight away.
   const anyChallenger = game.settings.challengesEnabled
     && game.players.some((p, i) => i !== game.current && p.tokens > 0);
@@ -1236,6 +1269,22 @@ function onLockPlacement() {
     revealMystery();
   }
   saveGame();
+  renderGame();
+}
+
+function onConfirmChallenge() {
+  if (selectedChallenger == null || selectedChallengeSlot == null) return;
+  try {
+    addChallenge(game, selectedChallenger, selectedChallengeSlot);
+    selectedChallenger = null;
+    selectedChallengeSlot = null;
+    saveGame();
+    renderGame();
+  } catch (err) { toast(err.message); }
+}
+
+function onCancelChallenge() {
+  selectedChallengeSlot = null;
   renderGame();
 }
 
@@ -1249,12 +1298,16 @@ function revealMystery() {
 
 function onReveal() {
   stopAudio();
+  selectedChallenger = null;
+  selectedChallengeSlot = null;
   revealMystery();
   saveGame();
   renderGame();
 }
 
 function onNextTurn() {
+  selectedChallenger = null;
+  selectedChallengeSlot = null;
   nextTurn(game);
   saveGame();
   if (game.phase === 'gameover') showWin();
@@ -1307,6 +1360,7 @@ function resumeGame() {
     gameDeckId = saved.deckId;
     selectedSlot = null;
     selectedChallenger = null;
+    selectedChallengeSlot = null;
     bonusAwarded = new Set();
     songVoted = { up: false, down: false };
     mysteryRetried = false;

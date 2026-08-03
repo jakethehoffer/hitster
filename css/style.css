@@ -225,32 +225,37 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 .timeline-owner { text-align: center; color: var(--ink-dim); margin-bottom: .6rem; }
 .timeline-owner b { color: var(--ink); }
 .timeline {
-  display: flex; align-items: stretch; gap: .35rem;
-  overflow-x: auto; padding: .6rem .2rem 1rem;
+  display: flex; align-items: stretch; gap: .6rem;
+  overflow-x: auto; padding: .8rem .35rem 1.1rem;
   scrollbar-width: thin;
 }
 .timeline-card {
-  flex: 0 0 auto; width: 8.2rem;
+  flex: 0 0 auto; width: 10rem; min-height: 7.4rem;
   background: var(--bg-card); border: 1px solid #3a2f57; border-radius: 10px;
-  padding: .6rem .5rem; text-align: center;
-  display: flex; flex-direction: column; gap: .2rem; justify-content: center;
+  padding: .9rem .75rem; text-align: center;
+  display: flex; flex-direction: column; gap: .25rem; justify-content: center;
 }
-.timeline-card .tc-year { font-size: 1.5rem; font-weight: 900; color: var(--accent-2); }
+.timeline-card .tc-year { font-size: 1.85rem; font-weight: 900; color: var(--accent-2); line-height: 1; }
+.timeline-card .tc-date { font-size: .68rem; font-weight: 600; color: var(--ink-dim); letter-spacing: .035em; line-height: 1.2; }
 .timeline-card .tc-title { font-size: .78rem; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .timeline-card .tc-artist { font-size: .7rem; color: var(--ink-dim); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .timeline-card.just-won { border-color: var(--ok); box-shadow: 0 0 14px rgba(52,211,153,.4); }
 
 .slot {
-  flex: 0 0 auto; width: 2.6rem; align-self: stretch;
+  flex: 0 0 auto; width: 3.4rem; align-self: stretch;
   border: 2px dashed #3a2f57; border-radius: 10px;
   background: transparent; color: var(--ink-dim);
-  font-size: 1.3rem; font-weight: 800; cursor: pointer;
+  font-size: 1.5rem; font-weight: 800; cursor: pointer;
   transition: all .12s ease;
   display: flex; align-items: center; justify-content: center;
-  min-height: 5.4rem;
+  min-height: 7.4rem;
 }
 .slot:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: rgba(255,61,129,.08); }
-.slot.selected { border-style: solid; border-color: var(--accent); color: var(--accent); background: rgba(255,61,129,.15); }
+.slot.selected {
+  border-style: solid; border-color: var(--accent); color: var(--accent);
+  background: rgba(255,61,129,.15);
+  box-shadow: 0 0 0 2px rgba(255,61,129,.18), 0 0 18px rgba(255,61,129,.3);
+}
 .slot.challenged { border-style: solid; border-color: var(--accent-2); color: var(--accent-2); background: rgba(34,211,238,.12); font-size: .95rem; }
 .slot:disabled { opacity: .35; cursor: default; }
 
@@ -262,7 +267,13 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 
 /* challenge list */
 .challenge-picker { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; margin: .8rem 0; }
-.challenge-picker .btn.picked { border-color: var(--accent-2); color: var(--accent-2); }
+.challenge-picker .btn.picked { border-color: var(--accent-2); color: var(--accent-2); box-shadow: 0 0 14px rgba(34,211,238,.2); }
+.challenge-picker + .phase-sub + .phase-controls {
+  width: fit-content; margin: .25rem auto 1rem; padding: .65rem;
+  background: rgba(36,28,54,.65); border: 1px solid #3a2f57; border-radius: var(--radius);
+}
+.challenge-picker + .phase-sub + .phase-controls .btn { min-width: 8rem; }
+.challenge-picker + .phase-sub + .phase-controls .btn-primary { box-shadow: 0 0 18px rgba(255,61,129,.25); }
 
 /* win screen */
 #win-timelines { margin: 1.5rem 0; text-align: left; }
@@ -280,5 +291,8 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 
 @media (max-width: 640px) {
   .hero { padding-top: 4vh; }
-  .timeline-card { width: 6.8rem; }
+  .timeline { gap: .45rem; padding-inline: .15rem; }
+  .timeline-card { width: 8.2rem; min-height: 6.8rem; padding: .75rem .55rem; }
+  .timeline-card .tc-year { font-size: 1.65rem; }
+  .slot { width: 3rem; min-height: 6.8rem; }
 }
