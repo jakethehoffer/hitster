@@ -20,19 +20,35 @@ let width = 0;
 let height = 0;
 let dpr = 1;
 
-// The record's place on screen, so notes leave from its rim.
+// The record's place on screen, so notes leave from its rim. Until a turntable
+// reports in — an easter egg switched on outside a game — the room uses its
+// own middle.
 let origin = { x: 0, y: 0, r: 60 };
+let originSet = false;
 
 let dancing = false;
+let party = false;
+let crazy = false;
 let noteAngle = 0;
 let gridPhase = 0;
 let spawnCarry = 0;
+let clock = 0;
+let crazyTimer = 0;
 
 const notes = [];
 const sparks = [];
 const rings = [];
 let blobs = [];
 let dancers = [];
+let lasers = [];
+let ballSpots = [];
+const crowd = [];
+
+// One at a time, doubling every second, until the screen cannot hold any more.
+const CROWD_START = 1;
+const CROWD_MAX = 256;
+const CROWD_DOUBLE_MS = 1000;
+const SCREAMS = ['AAAAA', 'WOOO', 'AAAH', 'YEAAH', 'AHHH'];
 
 export function attachStageFx(node) {
   canvas = node;
@@ -52,6 +68,7 @@ export function detachStageFx() {
 export function setStageOrigin(rect) {
   if (!rect || !rect.width) return;
   origin = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, r: rect.width * 0.28 };
+  originSet = true;
 }
 
 export function setDanceMode(on) {
@@ -61,13 +78,36 @@ export function setDanceMode(on) {
 
 export function danceMode() { return dancing; }
 
+export function setPartyMode(on) {
+  party = !!on;
+  document.body.classList.toggle('party', party);
+  if (party && !ballSpots.length) buildBallSpots();
+}
+
+export function partyMode() { return party; }
+
+// The crowd starts as one and doubles every second. Switching it off empties
+// the room, so it always starts from one again.
+export function setCrazyMode(on) {
+  crazy = !!on;
+  crowd.length = 0;
+  crazyTimer = 0;
+  if (crazy) for (let i = 0; i < CROWD_START; i++) crowd.push(makeCrazy());
+}
+
+export function crazyMode() { return crazy; }
+
 export function stageFxState() {
   return {
     attached: canvas != null,
     dancing,
+    party,
+    crazy,
     notes: notes.length,
     sparks: sparks.length,
     dancers: dancing ? dancers.length : 0,
+    crowd: crowd.length,
+    lasers: lasers.length,
   };
 }
 
@@ -90,6 +130,14 @@ function buildScene() {
     vx: rand(-0.02, 0.02), vy: rand(-0.015, 0.015),
     r: rand(0.28, 0.52), hue: i * 55,
   }));
+  // Six rigs on the ceiling, three a side, sweeping past each other.
+  lasers = Array.from({ length: 6 }, (_, i) => ({
+    x: i < 3 ? 0.06 + i * 0.07 : 0.94 - (i - 3) * 0.07,
+    aim: i < 3 ? 0.7 : -0.7,
+    swing: rand(0.5, 0.9),
+    phase: rand(0, TAU),
+    hue: i * 40,
+  }));
   buildDancers();
 }
 
@@ -103,11 +151,37 @@ function buildDancers() {
   }));
 }
 
+// The speckle a mirror ball throws around a room.
+function buildBallSpots() {
+  ballSpots = Array.from({ length: 40 }, () => ({
+    a: rand(0, TAU),
+    r: rand(0.15, 0.75),
+    tilt: rand(0.3, 0.85),
+    size: rand(0.006, 0.022),
+    hue: rand(0, 360),
+  }));
+}
+
+function makeCrazy() {
+  return {
+    x: rand(0.05, 0.95),
+    y: rand(0.15, 0.9),
+    vx: rand(-0.14, 0.14),
+    vy: rand(-0.1, 0.1),
+    rot: rand(-0.4, 0.4),
+    vrot: rand(-5, 5),
+    scale: rand(0.7, 1.3),
+    phase: rand(0, TAU),
+    scream: SCREAMS[Math.floor(Math.random() * SCREAMS.length)],
+  };
+}
+
 // p: { levels, bass, energy, hue, beat, playing, dt, now }
 export function renderStage(p) {
   if (!ctx || !canvas) return;
   measure();
   if (!width || !height) return;
+  if (!originSet) origin = { x: width / 2, y: height / 2, r: Math.min(width, height) * 0.12 };
   const g = ctx;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, width, height);
@@ -116,17 +190,42 @@ export function renderStage(p) {
 
   drawBlobs(g, p);
   drawFloor(g, p);
+  drawLasers(g, p);
+  if (party) drawBallSpots(g, p);
   drawRings(g, p);
   drawEqualiser(g, p);
   if (dancing) drawDancers(g, p);
   drawSparks(g);
   drawNotes(g);
+  if (crazy) drawCrowd(g, p);
   g.globalCompositeOperation = 'source-over';
   g.globalAlpha = 1;
 }
 
 function step(p) {
   const { dt, bass, energy, playing, beat, hue } = p;
+  clock += dt;
+
+  for (const laser of lasers) laser.phase += dt * laser.swing * (0.6 + bass * 1.6);
+  for (const spot of ballSpots) spot.a += dt * (0.25 + energy * 0.7);
+
+  if (crazy) {
+    crazyTimer += dt * 1000;
+    while (crazyTimer >= CROWD_DOUBLE_MS && crowd.length < CROWD_MAX) {
+      crazyTimer -= CROWD_DOUBLE_MS;
+      const grown = Math.min(CROWD_MAX, crowd.length * 2 || CROWD_START);
+      while (crowd.length < grown) crowd.push(makeCrazy());
+    }
+    for (const c of crowd) {
+      c.x += c.vx * dt;
+      c.y += c.vy * dt;
+      if (c.x < 0.03 || c.x > 0.97) c.vx *= -1;
+      if (c.y < 0.1 || c.y > 0.95) c.vy *= -1;
+      c.rot += c.vrot * dt;
+      if (c.rot > 0.5 || c.rot < -0.5) c.vrot *= -1;
+      c.phase += dt * 9;
+    }
+  }
 
   for (const b of blobs) {
     b.x += b.vx * dt * (0.4 + energy);
@@ -232,10 +331,60 @@ function drawBlobs(g, p) {
   }
 }
 
+// Thin beams off ceiling rigs, sweeping past each other. Kept to single lines
+// with one soft pass behind them — the room reads busier the moment they blur.
+function drawLasers(g, p) {
+  g.globalCompositeOperation = 'lighter';
+  const reach = height * 1.25;
+  const punch = party ? 1.9 : 1;
+  for (const laser of lasers) {
+    const x = laser.x * width;
+    const angle = Math.PI / 2 + laser.aim * 0.55 * Math.sin(laser.phase);
+    const x2 = x + Math.cos(angle) * reach;
+    const y2 = Math.sin(angle) * reach;
+    const hue = party ? (p.hue + laser.hue * 2 + clock * 90) % 360 : p.hue + laser.hue * 0.4;
+    const alpha = Math.min(0.4, (0.05 + p.bass * 0.12 + (party ? 0.06 : 0)) * punch);
+    // Beams die away before they reach the text: bright at the rig, gone by
+    // the time they cross anything a player has to read.
+    const beam = (light, width) => {
+      const grad = g.createLinearGradient(x, 0, x2, y2);
+      grad.addColorStop(0, `hsla(${hue}, 100%, ${light}%, ${alpha.toFixed(3)})`);
+      grad.addColorStop(0.45, `hsla(${hue}, 100%, ${light}%, ${(alpha * 0.45).toFixed(3)})`);
+      grad.addColorStop(1, `hsla(${hue}, 100%, ${light}%, 0)`);
+      g.strokeStyle = grad;
+      g.lineWidth = width;
+      g.beginPath();
+      g.moveTo(x, 0);
+      g.lineTo(x2, y2);
+      g.stroke();
+    };
+    beam(70, 4 + p.bass * 4);
+    beam(90, 1);
+  }
+}
+
+// The speckle a mirror ball throws: dots orbiting the room on a tilted path.
+function drawBallSpots(g, p) {
+  g.globalCompositeOperation = 'lighter';
+  const rx = width * 0.52;
+  const ry = height * 0.42;
+  for (const spot of ballSpots) {
+    const x = origin.x + Math.cos(spot.a) * rx * spot.r;
+    const y = origin.y + Math.sin(spot.a) * ry * spot.r * spot.tilt;
+    const r = Math.min(width, height) * spot.size * 0.7 * (1 + p.bass * 0.5);
+    g.fillStyle = `hsla(${(spot.hue + clock * 60) % 360}, 100%, 72%, ${(0.14 + p.energy * 0.22).toFixed(3)})`;
+    g.beginPath();
+    g.arc(x, y, r, 0, TAU);
+    g.fill();
+  }
+}
+
 // A dance floor running to a vanishing point, scrolling towards the room.
+// In party mode the tiles light up instead, Saturday-night style.
 function drawFloor(g, p) {
   const horizon = height * 0.58;
   const vx = width / 2;
+  if (party) { drawDiscoFloor(g, p, horizon, vx); return; }
   g.globalCompositeOperation = 'lighter';
   g.lineWidth = 1;
   for (let i = 0; i < 14; i++) {
@@ -266,6 +415,56 @@ function drawRings(g, p) {
     g.beginPath();
     g.arc(origin.x, origin.y, origin.r + ring.age * reach, 0, TAU);
     g.stroke();
+  }
+}
+
+function drawDiscoFloor(g, p, horizon, vx) {
+  g.globalCompositeOperation = 'lighter';
+  const rows = 9;
+  const cols = 10;
+  for (let r = 0; r < rows; r++) {
+    const t0 = (r + gridPhase) / rows;
+    const t1 = (r + 1 + gridPhase) / rows;
+    const yA = horizon + (height - horizon) * (t0 * t0);
+    const yB = horizon + (height - horizon) * (t1 * t1);
+    if (yB < horizon) continue;
+    const spreadA = width * (0.04 + t0 * 0.5);
+    const spreadB = width * (0.04 + t1 * 0.5);
+    for (let c = 0; c < cols; c++) {
+      const i = c - cols / 2;
+      const lit = (Math.floor(clock * 3) + r + c) % 3 === 0;
+      const hue = (p.hue + (r * 40) + c * 25 + clock * 120) % 360;
+      g.fillStyle = `hsla(${hue}, 100%, 62%, ${(lit ? 0.055 + p.bass * 0.085 : 0.022).toFixed(3)})`;
+      g.beginPath();
+      g.moveTo(vx + i * spreadA, yA);
+      g.lineTo(vx + (i + 1) * spreadA, yA);
+      g.lineTo(vx + (i + 1) * spreadB, yB);
+      g.lineTo(vx + i * spreadB, yB);
+      g.closePath();
+      g.fill();
+    }
+  }
+}
+
+function drawCrowd(g, p) {
+  const size = Math.min(width, height) * 0.14;
+  g.globalCompositeOperation = 'source-over';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  for (const c of crowd) {
+    const x = c.x * width;
+    const y = c.y * height + Math.sin(c.phase) * size * 0.09;
+    const s = c.scale * (1 + Math.sin(c.phase * 2) * 0.08);
+    g.save();
+    g.translate(x, y);
+    g.rotate(c.rot + Math.sin(c.phase) * 0.14);
+    g.font = `${(size * s).toFixed(0)}px ${EMOJI_FONT}`;
+    g.fillText('🕺', 0, 0);
+    // screaming, drawn rather than played — the song is still the point
+    g.font = `800 ${(size * s * 0.24).toFixed(0)}px "Segoe UI", system-ui, sans-serif`;
+    g.fillStyle = `hsla(${(p.hue + 40) % 360}, 100%, 78%, ${(0.55 + Math.sin(c.phase) * 0.35).toFixed(3)})`;
+    g.fillText(c.scream, size * s * 0.42, -size * s * 0.34);
+    g.restore();
   }
 }
 

@@ -12,7 +12,7 @@
 // flat while audio still plays — that case falls back to a synthesised pattern
 // instead of leaving a dead ring on screen.
 
-import { renderStage, setStageOrigin, stageFxState } from './stage-fx.js';
+import { renderStage, setStageOrigin, stageFxState, partyMode } from './stage-fx.js';
 
 const TAU = Math.PI * 2;
 export const BANDS = 64;
@@ -23,15 +23,29 @@ const FFT_SIZE = 2048;
 
 // ---------- analysis (pure, unit-tested) ----------
 
+// The top of the spectrum is dead air: the 30-second previews are lossy, and
+// every codec that makes them low-passes somewhere around 15kHz. Mapping bands
+// all the way to Nyquist therefore spends a quarter of the ring on bins that
+// are silent no matter what plays — a permanent gap in the same place. Bands
+// stop at CEILING_HZ so every one of them carries real music.
+export const CEILING_HZ = 14000;
+
+export function topBinFor(sampleRate, binCount, ceilingHz = CEILING_HZ) {
+  if (!sampleRate || !binCount) return binCount - 1;
+  const nyquist = sampleRate / 2;
+  const bin = Math.round((ceilingHz / nyquist) * binCount);
+  return Math.max(8, Math.min(binCount - 1, bin));
+}
+
 // Log-spaced band peaks, 0..1. Linear FFT bins spend most of their resolution
 // on treble, where music has the least going on; log spacing is what makes the
 // ring move the way the song actually sounds.
-export function bandLevels(freq, bands = BANDS, out = new Float32Array(bands)) {
-  const maxBin = freq.length - 1;
+export function bandLevels(freq, bands = BANDS, out = new Float32Array(bands), topBin = freq.length - 1) {
+  const maxBin = Math.max(2, Math.min(freq.length - 1, topBin));
   let lo = 1;
   for (let b = 0; b < bands; b++) {
     // exclusive edge, so the last band still reads the top bin
-    const hi = Math.min(freq.length, Math.max(lo + 1, Math.round(maxBin ** ((b + 1) / bands)) + 1));
+    const hi = Math.min(maxBin + 1, Math.max(lo + 1, Math.round(maxBin ** ((b + 1) / bands)) + 1));
     let peak = 0;
     for (let i = lo; i < hi; i++) if (freq[i] > peak) peak = freq[i];
     out[b] = peak / 255;
@@ -103,6 +117,7 @@ export function seedFrom(text) {
 let audioCtx = null;
 let analyser = null;
 let freqBytes = null;
+let analysisTopBin = 0;
 let graph = 'idle'; // idle | starting | live | unavailable
 
 // Must be called from a user gesture. A media element routed into a suspended
@@ -135,6 +150,7 @@ export function primeAudioGraph(media) {
       source.connect(analyser);
       analyser.connect(ctx.destination);
       freqBytes = new Uint8Array(analyser.frequencyBinCount);
+      analysisTopBin = topBinFor(ctx.sampleRate, analyser.frequencyBinCount);
       audioCtx = ctx;
       graph = 'live';
     } catch {
@@ -207,8 +223,13 @@ export function detachVisualizer() {
 
 // State the smoke test and the browser check assert on.
 export function visualizerState() {
+  // deadTop counts bands at the outer end of the ring with nothing in them —
+  // the arc that used to sit dark because it was mapped above the low-pass.
+  let deadTop = 0;
+  while (deadTop < BANDS && view.smooth[BANDS - 1 - deadTop] < 0.02) deadTop += 1;
   return {
     graph,
+    deadTop,
     mode: view.mode,
     attached: view.canvas != null,
     running: raf !== 0,
@@ -243,8 +264,13 @@ function frame(t) {
   view.energy = total / BANDS;
   view.bass = bassLevel(s);
 
-  const targetHue = playing ? spectralHue(s) : 330;
-  view.hue += (targetHue - view.hue) * Math.min(1, dt * 2.5);
+  if (partyMode()) {
+    // A disco doesn't care what the spectrum says: the whole room cycles.
+    view.hue = (view.hue + dt * (70 + view.energy * 220)) % 360;
+  } else {
+    const targetHue = playing ? spectralHue(s) : 330;
+    view.hue += (targetHue - view.hue) * Math.min(1, dt * 2.5);
+  }
 
   // Beats come off the raw bass: the smoothed copy exists to look good, and
   // its slow fall fills in exactly the dips a beat is measured against.
@@ -299,7 +325,7 @@ function frame(t) {
 function readLevels(t, playing) {
   if (analyser && freqBytes && !view.forceSim) {
     analyser.getByteFrequencyData(freqBytes);
-    bandLevels(freqBytes, BANDS, view.raw);
+    bandLevels(freqBytes, BANDS, view.raw, analysisTopBin);
     let peak = 0;
     for (let i = 0; i < BANDS; i++) if (view.raw[i] > peak) peak = view.raw[i];
     if (peak > 0.004) view.lastSound = t;

@@ -9,7 +9,8 @@ import {
   seedFrom, visualizerState,
 } from './visualizer.js';
 import {
-  attachStageFx, detachStageFx, setDanceMode, danceMode, stageFxState,
+  attachStageFx, detachStageFx, stageFxState,
+  setDanceMode, danceMode, setPartyMode, partyMode, setCrazyMode, crazyMode,
 } from './stage-fx.js';
 import { HINT_KINDS, hintAvailable, hintLabel, hintReveal } from './hints.js';
 import {
@@ -71,19 +72,30 @@ const storage = (() => {
 
 // ---------- screens ----------
 
-function showScreen(name) {
-  document.querySelectorAll('[data-screen]').forEach((s) =>
-    s.classList.toggle('hidden', s.dataset.screen !== name));
-  // The game screen is laid out as one fixed-height page; every other screen
-  // is a normal scrolling document.
-  document.body.classList.toggle('in-game', name === 'game');
-  if (name === 'game') {
+let currentScreen = 'home';
+
+// The room paints during a game, and anywhere else an easter egg is running —
+// typing "party" on the home screen should do something.
+function syncStageFx() {
+  const wanted = currentScreen === 'game' || danceMode() || partyMode() || crazyMode();
+  document.body.classList.toggle('fx-on', wanted);
+  if (wanted) {
     attachStageFx($('#stage-fx'));
     ensureVisualizerLoop();
   } else {
     detachStageFx();
     detachVisualizer();
   }
+}
+
+function showScreen(name) {
+  document.querySelectorAll('[data-screen]').forEach((s) =>
+    s.classList.toggle('hidden', s.dataset.screen !== name));
+  // The game screen is laid out as one fixed-height page; every other screen
+  // is a normal scrolling document.
+  document.body.classList.toggle('in-game', name === 'game');
+  currentScreen = name;
+  syncStageFx();
   if (name === 'home') renderHome();
   if (name === 'decks') renderDeckList();
   if (name === 'setup') renderSetup();
@@ -182,29 +194,71 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// Type "dance" anywhere outside a text box and the floor fills up. Typing it
-// again sends them home; the choice is remembered for next time.
-const DANCE_KEY = 'hitster.danceMode';
-const DANCE_WORD = 'dance';
-let danceBuffer = '';
+// Type one of these anywhere outside a text box to flip it on, type it again to
+// flip it off. Dance and party are remembered for next time; the crowd is not —
+// nobody wants to reopen the app into two hundred people.
+const EGG_KEY = 'hitster.eggs';
+const EGGS = [
+  {
+    word: 'dance',
+    remember: true,
+    is: danceMode,
+    set: setDanceMode,
+    on: '🕺 Dance mode on — type "dance" again to clear the floor',
+    off: 'The dancers have gone home',
+  },
+  {
+    word: 'party',
+    remember: true,
+    is: partyMode,
+    set: setPartyMode,
+    on: '🪩 Disco! The record is a mirror ball — type "party" to switch it back',
+    off: 'Lights up, disco over',
+  },
+  {
+    word: 'crazy',
+    remember: false,
+    is: crazyMode,
+    set: setCrazyMode,
+    on: '😱 One dancer. Doubling every second. Type "crazy" to make it stop',
+    off: 'Crowd cleared',
+  },
+];
+const EGG_BUFFER = Math.max(...EGGS.map((e) => e.word.length));
+let eggBuffer = '';
 
-function toggleDance() {
-  const on = !danceMode();
-  setDanceMode(on);
-  try { storage.setItem(DANCE_KEY, on ? '1' : '0'); } catch { /* not worth a warning */ }
-  toast(on
-    ? '🕺 Dance mode on — type "dance" again to clear the floor'
-    : 'The dancers have gone home');
+function rememberEggs() {
+  try {
+    storage.setItem(EGG_KEY, JSON.stringify(
+      EGGS.filter((e) => e.remember && e.is()).map((e) => e.word)));
+  } catch { /* not worth a warning */ }
+}
+
+function restoreEggs() {
+  let saved = [];
+  try { saved = JSON.parse(storage.getItem(EGG_KEY)) || []; } catch { saved = []; }
+  // the pre-eggs single flag, so anyone already dancing keeps dancing
+  if (storage.getItem('hitster.danceMode') === '1') saved.push('dance');
+  for (const egg of EGGS) if (egg.remember) egg.set(saved.includes(egg.word));
+}
+
+function toggleEgg(egg) {
+  const on = !egg.is();
+  egg.set(on);
+  rememberEggs();
+  syncStageFx();
+  toast(on ? egg.on : egg.off, 4000);
 }
 
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key.length !== 1) return;
   if (e.target.closest('input, textarea, select')) return;
-  danceBuffer = (danceBuffer + e.key.toLowerCase()).slice(-DANCE_WORD.length);
-  if (danceBuffer !== DANCE_WORD) return;
-  danceBuffer = '';
-  toggleDance();
+  eggBuffer = (eggBuffer + e.key.toLowerCase()).slice(-EGG_BUFFER);
+  const hit = EGGS.find((egg) => eggBuffer.endsWith(egg.word));
+  if (!hit) return;
+  eggBuffer = '';
+  toggleEgg(hit);
 });
 
 // Spacebar = pause/resume the mystery song during a turn. Ignored while
@@ -1546,7 +1600,7 @@ function clearSavedGamePreviews() {
 document.addEventListener('DOMContentLoaded', () => {
   ensureSeedDecks(storage);
   if (refreshCachedPreviews(storage)) clearSavedGamePreviews();
-  setDanceMode(storage.getItem(DANCE_KEY) === '1');
+  restoreEggs();
 
   document.querySelectorAll('[data-nav]').forEach((b) =>
     b.addEventListener('click', () => showScreen(b.dataset.nav)));

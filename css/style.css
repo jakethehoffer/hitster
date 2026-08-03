@@ -33,9 +33,9 @@ main { max-width: 1100px; margin: 0 auto; padding: 1.2rem; position: relative; z
   width: 100%; height: 100%;
   z-index: 0; pointer-events: none;
 }
-body.in-game .stage-fx { display: block; }
+body.fx-on .stage-fx { display: block; }
 @media (prefers-reduced-motion: reduce) {
-  body.in-game .stage-fx { display: none; }
+  body.fx-on .stage-fx { display: none; }
 }
 
 .hidden { display: none !important; }
@@ -272,6 +272,35 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 }
 .vinyl.spinning { animation: spin var(--spin, 1.8s) linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* party mode: the record becomes a mirror ball, facets and all */
+body.party .vinyl {
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255,255,255,.6) 0 4%, rgba(255,255,255,0) 22%),
+    repeating-conic-gradient(from 0deg,
+      hsla(var(--hue, 330), 90%, 74%, .55) 0 4deg,
+      hsla(calc(var(--hue, 330) + 60), 90%, 42%, .55) 4deg 8deg),
+    repeating-radial-gradient(circle at 50% 50%,
+      rgba(255,255,255,.20) 0 4%, rgba(0,0,0,.30) 4% 8%),
+    radial-gradient(circle at 38% 30%, #f6f2ff 0 12%, #9aa2c8 38%, #2a2b45 78%, #101226 100%);
+  border-color: rgba(255,255,255,.25);
+  box-shadow:
+    0 10px 40px rgba(0,0,0,.6),
+    0 0 calc(20px + var(--glow, 0) * 70px)
+      hsla(var(--hue, 330), 100%, 70%, calc(.3 + var(--glow, 0) * .6));
+}
+body.party .vinyl.spinning { animation-duration: calc(var(--spin, 1.8s) * 1.6); }
+/* the wire the ball hangs from */
+body.party .vinyl-hold::before {
+  content: '';
+  position: absolute; left: 50%; top: -14%; width: 2px; height: 22%;
+  transform: translateX(-50%);
+  background: linear-gradient(rgba(255,255,255,0), rgba(255,255,255,.45));
+}
+body.party .deck-glow {
+  background: radial-gradient(closest-side,
+    hsla(calc(var(--hue, 330) + 40), 100%, 70%, calc(.3 + var(--glow, 0) * .55)), transparent);
+}
 @media (prefers-reduced-motion: reduce) {
   .vinyl.spinning { animation: none; }
   .deck-stage { transform: none; }

@@ -107,6 +107,23 @@ if (eminemSeed.total !== 772 || eminemSeed.playable !== 514 || eminemSeed.archiv
   console.log('  ✔ Eminem catalogue: 514 playable + 258 archive-only, correctly labelled');
 }
 
+// The century deck has to actually span a century, or it is just another
+// decades deck with an ambitious name.
+const billboard = await page.evaluate(() => {
+  const ids = JSON.parse(localStorage.getItem('hitster.deckIndex') || '[]');
+  const deck = ids.map((id) => JSON.parse(localStorage.getItem(`hitster.deck.${id}`) || 'null'))
+    .find((d) => d && d.seedKey === 'billboard-century');
+  if (!deck) return { error: 'not installed' };
+  const years = deck.songs.map((s) => s.year);
+  const decades = new Set(years.map((y) => Math.floor(y / 10) * 10));
+  return { songs: deck.songs.length, from: Math.min(...years), to: Math.max(...years), decades: decades.size };
+});
+if (billboard.error || billboard.from > 1930 || billboard.to < 2020 || billboard.decades < 10) {
+  errors.push(`Billboard century deck: ${JSON.stringify(billboard)}`);
+} else {
+  console.log(`  ✔ Billboard century deck: ${billboard.songs} songs, ${billboard.from}-${billboard.to}, ${billboard.decades} decades`);
+}
+
 // Install a deterministic test deck (with fake previews so no iTunes calls),
 // and mark the seed as installed so only the test deck exists.
 await page.evaluate((seeds) => {
@@ -266,6 +283,32 @@ while (turns < 80 && !won) {
     else if (on.dancing !== true || on.dancers < 1) errors.push('typing "dance" did not put dancers on the floor');
     else if (off !== false) errors.push('typing "dance" again did not clear the floor');
     else if (roomPainted) console.log('  ✔ background stage painted and the dance easter egg toggles');
+
+    // "party": the record becomes a mirror ball and the room takes the theme
+    await page.keyboard.type('party');
+    const partyOn = await page.evaluate(() => ({
+      fx: window.__hitster.fx().party,
+      themed: document.body.classList.contains('party'),
+    }));
+    await page.keyboard.type('party');
+    const partyOff = await page.evaluate(() => window.__hitster.fx().party
+      || document.body.classList.contains('party'));
+    if (!partyOn.fx || !partyOn.themed) errors.push('typing "party" did not start the disco');
+    else if (partyOff) errors.push('typing "party" again did not end the disco');
+    else console.log('  ✔ party mode turns the record into a mirror ball and back');
+
+    // "crazy": one dancer, doubling every second
+    await page.keyboard.type('crazy');
+    const first = await page.evaluate(() => window.__hitster.fx().crowd);
+    const grown = await page.waitForFunction(() => window.__hitster.fx().crowd >= 4, { timeout: 6000 })
+      .then(() => true, () => false);
+    const peak = await page.evaluate(() => window.__hitster.fx().crowd);
+    await page.keyboard.type('crazy');
+    const cleared = await page.evaluate(() => window.__hitster.fx());
+    if (first !== 1) errors.push(`crazy mode started with ${first} instead of one`);
+    else if (!grown) errors.push('the crowd never doubled');
+    else if (cleared.crazy || cleared.crowd !== 0) errors.push('typing "crazy" again did not clear the crowd');
+    else console.log(`  ✔ crazy mode starts at one and doubles (reached ${peak}), then clears`);
   }
   // spacebar toggles playback during a turn (must not crash or scroll away)
   if (turns === 1) await page.keyboard.press('Space');

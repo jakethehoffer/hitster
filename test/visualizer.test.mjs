@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BANDS, bandLevels, spectralCentroid, spectralHue, bassLevel,
+  BANDS, CEILING_HZ, bandLevels, topBinFor, spectralCentroid, spectralHue, bassLevel,
   makeBeatDetector, simulatedLevels, seedFrom,
 } from '../js/visualizer.js';
 
@@ -35,6 +35,38 @@ test('bandLevels covers every bin — no energy falls between bands', () => {
     const levels = bandLevels(freq, BANDS);
     assert.ok(Math.max(...levels) === 1, `bin ${bin} was dropped`);
   }
+});
+
+test('topBinFor maps the ceiling onto the bin the sample rate puts it at', () => {
+  assert.equal(topBinFor(48000, 1024), Math.round((CEILING_HZ / 24000) * 1024));
+  assert.equal(topBinFor(44100, 1024), Math.round((CEILING_HZ / 22050) * 1024));
+  // never past the end, never so low there is nothing to spread over
+  assert.ok(topBinFor(8000, 1024) <= 1023);
+  assert.ok(topBinFor(192000, 64) >= 8);
+  assert.equal(topBinFor(0, 512), 511);
+});
+
+test('bands stop below the codec low-pass, so no arc of the ring is permanently dead', () => {
+  const top = topBinFor(48000, 1024);
+  // what a lossy 30-second preview looks like: music up to the low-pass, then
+  // digital silence for the rest of the spectrum
+  const freq = new Uint8Array(1024);
+  for (let i = 1; i <= top; i++) freq[i] = 120;
+
+  const uncapped = [...bandLevels(freq, BANDS)];
+  assert.ok(uncapped.some((v) => v === 0), 'the bug: mapping to Nyquist leaves top bands dark');
+  assert.equal(uncapped[BANDS - 1], 0, 'the outermost band sat above the low-pass');
+
+  const capped = [...bandLevels(freq, BANDS, new Float32Array(BANDS), top)];
+  assert.ok(capped.every((v) => v > 0), 'every band must carry music once capped');
+  assert.ok(capped[BANDS - 1] > 0);
+});
+
+test('a capped band map still refuses to read past the array', () => {
+  const freq = new Uint8Array(64);
+  freq[63] = 255;
+  assert.equal(Math.max(...bandLevels(freq, 8, new Float32Array(8), 999)), 1);
+  assert.ok(Number.isFinite(bandLevels(freq, 8, new Float32Array(8), 0)[0]));
 });
 
 test('spectralCentroid and spectralHue place bass on pink and treble on cyan', () => {

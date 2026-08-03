@@ -121,7 +121,8 @@ test('seed decks are well-formed, unique within a deck, sized for a game to 10',
     for (const s of seed.songs) {
       assert.equal(typeof s.title, 'string');
       assert.equal(typeof s.artist, 'string');
-      assert.ok(Number.isInteger(s.year) && s.year >= 1950 && s.year <= 2026, `${s.title} year ${s.year}`);
+      // 1926 is the floor: the Billboard deck reaches back a full century
+      assert.ok(Number.isInteger(s.year) && s.year >= 1926 && s.year <= 2026, `${s.title} year ${s.year}`);
       const k = `${s.title}|${s.artist}`;
       assert.ok(!keys.has(k), `duplicate in ${seed.name}: ${k}`);
       keys.add(k);

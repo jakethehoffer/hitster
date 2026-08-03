@@ -35,8 +35,9 @@ Same as real Hitster:
    spectrum, the disc pulses and throws light on every kick, and the colour
    shifts from hot pink for bass-led songs towards cyan for bright ones.
    Behind it the whole room moves with the track: notes and sparks streaming
-   off the record in every direction, an equaliser along the floor, a dance
-   floor scrolling with the bass and light drifting across the back wall.
+   off the record in every direction, thin lasers sweeping from the ceiling,
+   an equaliser along the floor, a dance floor scrolling with the bass and
+   light drifting across the back wall.
    Pause and resume anytime with the button or the **spacebar** (it picks up
    where it left off). With **Hard draws** on (the default), the game picks
    songs whose years land close to the cards already in your timeline —
@@ -95,9 +96,16 @@ footer, or on the win screen) leaves the current deck for another one without
 losing anyone, and reopening the app after a reload finds everybody still
 there.
 
-Type **dance** at any point (anywhere except a text box) and a line of dancers
-takes the floor, jumping on every beat under sweeping spotlights. Type it again
-to send them home; the app remembers which you prefer.
+Three words do things. Type them anywhere except a text box, and type them
+again to switch them back off:
+
+- **dance** — a line of dancers takes the floor, jumping on every beat under
+  sweeping spotlights.
+- **party** — the record becomes a mirror ball, the colours cycle, the lasers
+  go rainbow and the floor lights up like a disco. Remembered, like dance.
+- **crazy** — one dancer appears, and every second the crowd doubles, until
+  the screen is full of them screaming. This one always starts fresh: nobody
+  wants to reopen the app into two hundred people.
 
 The game screen is built to sit in one viewport on a phone, a laptop or a TV —
 scoreboard, turntable, timeline and footer all on screen at once, with no
@@ -126,14 +134,23 @@ on the home screen picks up where you left off.
 `.hitster.json` file, send it to a friend, and they click **⇪ Import JSON** on
 their Decks screen. Decks live in each browser's localStorage.
 
-Seven built-in decks are included, each big enough for a game to 10 cards:
+Eight built-in decks are included, each big enough for a game to 10 cards:
 the **Starter deck** (61 hits, 1966–2024), **Rap & Hip-Hop** (61, 1979–2024),
 **Pop Through the Decades** (61, 1963–2024), **Rock Anthems** (50, 1965–2020),
 **R&B & Soul** (45, 1961–2023), **2000s & 2010s Throwbacks** (42), and
-**Name That Tune: Eminem — Complete Catalog** (772 song recordings, 1988–2025).
+**Name That Tune: Eminem — Complete Catalog** (772 song recordings, 1988–2025),
+and **Billboard Hits: 100 Years** (257 songs, 1926–2024).
 They're normal decks — edit, prune with 👎 votes, or delete them. When an
 update adds songs to a built-in deck, your copy gets the new songs on next
 load with all your ratings and edits kept.
+
+The Billboard deck is a curated century of American chart hits, spread across
+every decade from the 1920s to the 2020s — it is a selection of songs that
+topped or defined the charts, not a copy of the charts themselves (the Hot 100
+only began in 1958, so the early entries come from Billboard's earlier
+best-seller charts). Its oldest recordings are the thinnest on streaming; any
+song no source can find is quietly retired before anyone draws it, so the deck
+just plays a little shorter.
 
 The Eminem deck separates 514 commercially/publicly released recordings from
 258 documented demos, leaks, freestyles, and other archive recordings. The
@@ -167,6 +184,9 @@ want, or hit **↻ Fix preview** on the song's row in the deck list below.
   spectrum ring, the beat detector and the colour — `js/stage-fx.js` paints the
   room behind the game off the same analysis, and `js/hints.js` decides what a
   clue may reveal.
+- Bands stop at 14kHz rather than Nyquist. Preview codecs low-pass around
+  15kHz, so mapping the ring all the way up left a fixed arc of it permanently
+  dark no matter what played.
 - The audio element is `crossorigin="anonymous"` on purpose: both preview
   hosts answer with `Access-Control-Allow-Origin: *`, and without it Web Audio
   only ever sees silence. If a host ever refused, the visuals fall back to a
