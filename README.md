@@ -30,8 +30,12 @@ Same as real Hitster:
    choose cards-to-win (10 is classic) and type any starting-token count
    (0–20), press **Start game**.
 2. On your turn press **Draw a song**, then **Play song**. A mystery song
-   plays — no title, no artist, no year. Pause and resume anytime with the
-   button or the **spacebar** (it picks up where it left off). With **Hard
+   plays — no title, no artist, no year. The record spins and the ring of
+   lights around it dances to whatever is playing: the bars follow the
+   spectrum, the disc pulses and throws light on every kick, and the colour
+   shifts from hot pink for bass-led songs towards cyan for bright ones.
+   Pause and resume anytime with the button or the **spacebar** (it picks up
+   where it left off). With **Hard
    draws** on (the default), the game picks songs whose years land close to
    the cards already in your timeline — placements are always a genuine call,
    never a gimme decades outside your range. A mystery song never shares a
@@ -82,6 +86,10 @@ another game with the same people and deck, **⇄ Change deck** (in the game
 footer, or on the win screen) leaves the current deck for another one without
 losing anyone, and reopening the app after a reload finds everybody still
 there.
+
+The game screen is built to sit in one viewport on a phone, a laptop or a TV —
+scoreboard, turntable, timeline and footer all on screen at once, with no
+scrolling to reach the slots you tap.
 
 The game autosaves after every move — if the browser closes, **Resume game**
 on the home screen picks up where you left off.
@@ -142,7 +150,13 @@ want, or hit **↻ Fix preview** on the song's row in the deck list below.
   (`npm install` once first; set `BROWSER_PATH` if your browser is elsewhere).
 - No build step. `js/engine.js` is the pure rules engine (no DOM); `js/app.js`
   is the UI controller; `js/itunes.js` wraps the iTunes Search API via JSONP;
-  `js/decks.js` + `js/seed-deck.js` handle deck storage.
+  `js/decks.js` + `js/seed-deck.js` handle deck storage; `js/visualizer.js`
+  owns the turntable — an AnalyserNode over the `<audio>` element feeds the
+  spectrum ring, the beat detector and the colour.
+- The audio element is `crossorigin="anonymous"` on purpose: both preview
+  hosts answer with `Access-Control-Allow-Origin: *`, and without it Web Audio
+  only ever sees silence. If a host ever refused, the visuals fall back to a
+  synthesised pattern rather than freezing.
 
 ## Known limits
 

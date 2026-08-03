@@ -211,6 +211,35 @@ while (turns < 80 && !won) {
       }
     }
   }
+  // The turntable is the centrepiece of the listening screen, and the whole
+  // screen has to sit inside one viewport — the timeline is what players tap,
+  // so it can never be pushed below the fold.
+  if (turns === 1) {
+    // An untouched canvas still reports width 300, so the only honest test of
+    // "it painted" is a pixel. Polling also rides out the render that swaps in
+    // a fresh canvas a frame before the loop draws on it.
+    const painted = await page.waitForFunction(() => {
+      const c = document.querySelector('canvas.viz');
+      if (!c) return false;
+      const px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      for (let i = 3; i < px.length; i += 4) if (px[i] > 4) return true;
+      return false;
+    }, { timeout: 5000 }).then(() => true, () => false);
+    const stage = await page.evaluate((drew) => {
+      if (!drew) return 'the turntable canvas never painted';
+      if (!document.querySelector('.deck-stage .vinyl')) return 'no record';
+      if (!window.__hitster.viz().attached) return 'visualiser not attached';
+      if (!document.body.classList.contains('in-game')) return 'game screen is not in one-page mode';
+      const bottom = (sel) => document.querySelector(sel).getBoundingClientRect().bottom;
+      const room = window.innerHeight + 1;
+      if (document.documentElement.scrollHeight > room) return 'the page scrolls';
+      if (bottom('#timeline-area') > room) return 'the timeline is below the fold';
+      if (bottom('.game-footer') > room) return 'the footer is below the fold';
+      return 'ok';
+    }, painted);
+    if (stage !== 'ok') errors.push(`turntable/one-page layout: ${stage}`);
+    else console.log('  ✔ turntable painted and the whole game screen fits one viewport');
+  }
   // spacebar toggles playback during a turn (must not crash or scroll away)
   if (turns === 1) await page.keyboard.press('Space');
   // Cutting a song mid-listen rejects it AND moves on, for free — so it must

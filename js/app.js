@@ -5,6 +5,9 @@ import {
 import { searchSongs, resolvePreview, resolveReleaseDate, looksLikeAltVersion } from './itunes.js';
 import { artistTopTracks, albumYear, looksLikeCompilation } from './deezer.js';
 import {
+  attachVisualizer, detachVisualizer, primeAudioGraph, seedFrom, visualizerState,
+} from './visualizer.js';
+import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
   exportDeck, parseDeckImport, ensureSeedDecks, refreshCachedPreviews,
   availableSongs, playableSongs, excludedCount, unavailableCount,
@@ -66,6 +69,10 @@ const storage = (() => {
 function showScreen(name) {
   document.querySelectorAll('[data-screen]').forEach((s) =>
     s.classList.toggle('hidden', s.dataset.screen !== name));
+  // The game screen is laid out as one fixed-height page; every other screen
+  // is a normal scrolling document.
+  document.body.classList.toggle('in-game', name === 'game');
+  if (name !== 'game') detachVisualizer();
   if (name === 'home') renderHome();
   if (name === 'decks') renderDeckList();
   if (name === 'setup') renderSetup();
@@ -88,6 +95,9 @@ function stopAudio() {
 
 function toggleListen(url, btn) {
   const p = document.getElementById('player');
+  // Always from a click or a keypress, which is the only moment the browser
+  // lets us open the AudioContext the visualiser listens through.
+  primeAudioGraph(p);
   if (playingUrl === url) {
     // Same track: true pause/resume — keep the position, don't restart.
     if (p.paused) {
@@ -703,9 +713,27 @@ function renderScoreboard() {
 
 function activeName() { return game.players[game.current].name; }
 
+// The record, its spectrum ring and the light it throws. Rebuilt on every
+// render; the visualiser keeps its own state and just re-targets the canvas.
+function buildDeckStage() {
+  const p = document.getElementById('player');
+  const canvas = el('canvas', { class: 'viz' });
+  // The challenge screen carries the most rows of any phase; the record gives
+  // up its space there so the Reveal button never falls off the page.
+  const stage = el('div', { class: `deck-stage${game.phase === 'challenge' ? ' compact' : ''}` },
+    canvas,
+    el('div', { class: 'deck-glow' }),
+    el('div', { class: 'vinyl-hold' },
+      el('div', { class: `vinyl${!p.paused && playingUrl ? ' spinning' : ''}` })));
+  const song = game.mystery || {};
+  attachVisualizer(canvas, p, { seed: seedFrom(`${song.title || ''}|${song.artist || ''}`) });
+  return stage;
+}
+
 function renderPhase() {
   const area = clear($('#phase-area'));
   const phase = game.phase;
+  if (phase !== 'listening' && phase !== 'challenge') detachVisualizer();
 
   if (phase === 'idle') {
     area.append(
@@ -718,8 +746,7 @@ function renderPhase() {
 
   if (phase === 'listening' || phase === 'challenge') {
     const p = document.getElementById('player');
-    const vinyl = el('div', { class: `vinyl${!p.paused && playingUrl ? ' spinning' : ''}` });
-    area.append(vinyl);
+    area.append(buildDeckStage());
 
     if (previewState === 'loading') {
       area.append(el('p', { class: 'phase-sub', text: 'Finding the song preview…' }));
@@ -762,14 +789,21 @@ function renderPhase() {
           onclick: onHint,
         }));
       }
-      area.append(
+      // append() stringifies a null child, so conditional rows are filtered out
+      // rather than passed through.
+      area.append(...[
         el('h2', { class: 'phase-title' }, el('span', { class: 'who', text: activeName() }), ' — where does it go?'),
         controls,
         game.hintUsed ? el('p', {
           class: 'song-hint',
           text: `💡 Released in the ${Math.floor(game.mystery.year / 10) * 10}s`,
         }) : null,
-        el('p', { class: 'phase-sub', text: 'Tap a slot in your timeline below, then lock it in. Spacebar pauses/plays.' }));
+        // Once a slot is picked the instruction is spent — drop it and give
+        // the row back to the turntable.
+        selectedSlot == null
+          ? el('p', { class: 'phase-sub', text: 'Tap a slot in your timeline below, then lock it in. Spacebar pauses/plays.' })
+          : null,
+      ].filter(Boolean));
       if (selectedSlot != null) {
         area.append(el('div', { class: 'phase-controls' },
           el('button', { class: 'btn btn-primary btn-big', text: '🔒 Lock it in', onclick: onLockPlacement })));
@@ -808,7 +842,10 @@ function renderPhase() {
       }
       area.append(picker);
       if (selectedChallenger != null) {
-        area.append(el('p', { class: 'phase-sub', text: `${game.players[selectedChallenger].name}: tap the slot you think is right.` }));
+        // the instruction is spent once they have tapped one
+        if (selectedChallengeSlot == null) {
+          area.append(el('p', { class: 'phase-sub', text: `${game.players[selectedChallenger].name}: tap the slot you think is right.` }));
+        }
         if (selectedChallengeSlot != null) {
           area.append(el('div', { class: 'phase-controls' },
             el('button', { class: 'btn btn-primary btn-big', text: 'Confirm challenge', onclick: onConfirmChallenge }),
@@ -1558,6 +1595,7 @@ window.__hitster = {
   get previewState() { return previewState; },
   prefetch: (n) => prefetchUpcoming(n),
   refill: () => refillDeck(),
+  viz: () => visualizerState(),
 };
 
 // Concise, answer-safe state for browser automation and accessibility checks.

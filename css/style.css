@@ -201,18 +201,50 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 
 .phase-controls { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem; }
 
-/* vinyl */
+/* turntable — the record is CSS, the spectrum ring around it is canvas.
+   js/visualizer.js drives --hue, --glow, --pulse and --spin off the audio. */
+.deck-stage {
+  position: relative;
+  width: min(clamp(8rem, 34vh, 17rem), 76vw);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  transform: perspective(900px) rotateX(13deg);
+}
+.deck-stage.compact { width: min(clamp(4.5rem, 12vh, 8rem), 44vw); }
+.deck-stage .viz { position: absolute; inset: 0; width: 100%; height: 100%; }
+.deck-glow {
+  position: absolute; left: 50%; bottom: -7%; width: 76%; height: 20%;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side,
+    hsla(var(--hue, 330), 100%, 62%, calc(.22 + var(--glow, 0) * .5)), transparent);
+  filter: blur(7px);
+  pointer-events: none;
+}
+.vinyl-hold {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  transform: scale(var(--pulse, 1));
+}
 .vinyl {
-  width: 9.5rem; height: 9.5rem; margin: 0 auto 1rem;
+  width: 54%; aspect-ratio: 1;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 50% 50%, var(--accent) 0 14%, #1b1b1f 15% 34%, #101014 35% 44%, #1b1b1f 45% 58%, #101014 59% 72%, #1b1b1f 73% 100%);
-  border: 4px solid #000;
-  box-shadow: 0 10px 40px rgba(0,0,0,.6), 0 0 30px rgba(255,61,129,.15);
-  position: relative;
+    conic-gradient(from 0deg, rgba(255,255,255,.13), rgba(255,255,255,0) 22%,
+      rgba(255,255,255,.07) 48%, rgba(255,255,255,0) 74%, rgba(255,255,255,.13)),
+    radial-gradient(circle at 50% 50%, hsl(var(--hue, 330) 92% 62%) 0 13%, #0b0b0f 14% 17%,
+      #1b1b1f 18% 34%, #101014 35% 44%, #1b1b1f 45% 58%, #101014 59% 72%, #1b1b1f 73% 100%);
+  border: 3px solid #000;
+  box-shadow:
+    0 10px 40px rgba(0,0,0,.6),
+    0 0 calc(14px + var(--glow, 0) * 46px)
+      hsla(var(--hue, 330), 100%, 62%, calc(.18 + var(--glow, 0) * .5));
 }
-.vinyl.spinning { animation: spin 1.8s linear infinite; }
+.vinyl.spinning { animation: spin var(--spin, 1.8s) linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .vinyl.spinning { animation: none; }
+  .deck-stage { transform: none; }
+}
 
 /* reveal card */
 .reveal-card {
@@ -305,6 +337,44 @@ input:focus, select:focus { outline: 2px solid var(--accent-2); outline-offset: 
 @keyframes fall {
   to { transform: translateY(110vh) rotate(720deg); opacity: .7; }
 }
+
+/* ---------- one-page game screen ----------
+   The timeline is what players tap, so it can never sit below the fold: the
+   game screen is a fixed-height column — scoreboard, turntable, timeline and
+   footer all stay on screen, and only the middle scrolls if a phase runs long
+   on a very short window. */
+body.in-game { overflow: hidden; }
+body.in-game main {
+  height: 100vh; height: 100dvh;
+  padding: .7rem .9rem .5rem;
+  display: flex; flex-direction: column;
+}
+body.in-game [data-screen="game"] {
+  flex: 1; min-height: 0; padding-top: 0;
+  display: flex; flex-direction: column;
+}
+body.in-game .scoreboard { flex: 0 0 auto; gap: .45rem; margin-bottom: .5rem; }
+body.in-game .player-chip { padding: .35rem .75rem; }
+body.in-game .phase-area {
+  flex: 1 1 auto; min-height: 0; margin-bottom: .2rem;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .4rem; overflow-y: auto; overflow-x: hidden;
+}
+body.in-game .phase-area > * { margin: 0; }
+body.in-game .phase-title { font-size: clamp(1.05rem, 2.7vh, 1.5rem); }
+body.in-game .phase-sub { font-size: .85rem; }
+body.in-game .song-hint { padding: .4rem .9rem; }
+body.in-game .btn-big { padding: .65rem 1.6rem; }
+body.in-game .challenge-picker + .phase-sub + .phase-controls { margin: 0; padding: .45rem; }
+body.in-game .challenge-picker { margin: 0; }
+body.in-game .reveal-card { padding: .7rem 1.5rem; gap: .2rem; }
+body.in-game .reveal-card img { width: clamp(58px, 11vh, 140px); height: auto; aspect-ratio: 1; }
+body.in-game .reveal-card .reveal-year { font-size: clamp(1.8rem, 5vh, 3rem); }
+body.in-game .outcome { font-size: clamp(1rem, 2.6vh, 1.3rem); }
+body.in-game .timeline-area { flex: 0 0 auto; margin-bottom: 0; }
+body.in-game .timeline-owner { margin-bottom: .2rem; font-size: .9rem; }
+body.in-game .timeline { padding: .5rem .35rem .6rem; }
+body.in-game .game-footer { flex: 0 0 auto; margin-top: .35rem; }
 
 @media (max-width: 640px) {
   .hero { padding-top: 4vh; }

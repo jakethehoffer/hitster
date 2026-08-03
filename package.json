@@ -4,7 +4,7 @@
   "description": "Digital Hitster with custom song decks — pass-and-play music timeline party game",
   "type": "module",
   "scripts": {
-    "test": "node --test test/engine.test.mjs test/decks.test.mjs test/itunes.test.mjs test/deezer.test.mjs",
+    "test": "node --test test/engine.test.mjs test/decks.test.mjs test/itunes.test.mjs test/deezer.test.mjs test/visualizer.test.mjs",
     "smoke": "node test/smoke.mjs",
     "start": "npx -y serve -l 4173 ."
   },
