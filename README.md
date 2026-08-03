@@ -34,13 +34,21 @@ Same as real Hitster:
    lights around it dances to whatever is playing: the bars follow the
    spectrum, the disc pulses and throws light on every kick, and the colour
    shifts from hot pink for bass-led songs towards cyan for bright ones.
+   Behind it the whole room moves with the track: decks spinning in the
+   corners throwing sparks, notes streaming off the record in every direction,
+   an equaliser along the floor and light drifting across the back wall.
    Pause and resume anytime with the button or the **spacebar** (it picks up
-   where it left off). With **Hard
-   draws** on (the default), the game picks songs whose years land close to
-   the cards already in your timeline — placements are always a genuine call,
-   never a gimme decades outside your range. A mystery song never shares a
-   year with a card already on the active player's timeline.
-   Need help? **💡 Hint** costs 1 token and reveals the song's decade.
+   where it left off). With **Hard draws** on (the default), the game picks
+   songs whose years land close to the cards already in your timeline —
+   placements are always a genuine call, never a gimme decades outside your
+   range. A mystery song never shares a year with a card already on the active
+   player's timeline.
+   Stuck? Buy a **clue** for 1 token each: **🔤 Title** and **🎤 Artist**
+   show the shape of the words (first letters only, digits masked), and
+   **💿 Cover** shows the sleeve, blurred. No clue ever states or implies the
+   year — that is the question the game is asking, so the answer is never for
+   sale. Each clue is sold once per song, so a really stuck player can buy a
+   different angle instead of the same one twice.
 3. Tap the slot in your timeline where you think the song belongs
    (before/between/after your cards), then press **Lock it in**.
 4. Anyone else who thinks you're wrong can **challenge** for 1 token: tap
@@ -49,7 +57,7 @@ Same as real Hitster:
 5. **Reveal!** Correct placement keeps the card. If you were wrong and a
    challenger was right, they steal it.
 6. If anyone named the artist **and** title out loud, tap their name under
-   "Grab a token" (honor system). Tokens buy song skips, decade hints, and challenges.
+   "Grab a token" (honor system). Tokens buy song skips, clues, and challenges.
 7. Vote **👍 Keep it** or **👎 Cut it** on the song itself — available while
    it's still playing (before you lock in) and on the reveal screen. Votes
    save to the deck: a net-disliked song sits out all future games (the deck
@@ -86,6 +94,10 @@ another game with the same people and deck, **⇄ Change deck** (in the game
 footer, or on the win screen) leaves the current deck for another one without
 losing anyone, and reopening the app after a reload finds everybody still
 there.
+
+Type **dance** at any point (anywhere except a text box) and a line of dancers
+takes the floor, jumping on every beat under sweeping spotlights. Type it again
+to send them home; the app remembers which you prefer.
 
 The game screen is built to sit in one viewport on a phone, a laptop or a TV —
 scoreboard, turntable, timeline and footer all on screen at once, with no
@@ -152,7 +164,9 @@ want, or hit **↻ Fix preview** on the song's row in the deck list below.
   is the UI controller; `js/itunes.js` wraps the iTunes Search API via JSONP;
   `js/decks.js` + `js/seed-deck.js` handle deck storage; `js/visualizer.js`
   owns the turntable — an AnalyserNode over the `<audio>` element feeds the
-  spectrum ring, the beat detector and the colour.
+  spectrum ring, the beat detector and the colour — `js/stage-fx.js` paints the
+  room behind the game off the same analysis, and `js/hints.js` decides what a
+  clue may reveal.
 - The audio element is `crossorigin="anonymous"` on purpose: both preview
   hosts answer with `Access-Control-Allow-Origin: *`, and without it Web Audio
   only ever sees silence. If a host ever refused, the visuals fall back to a

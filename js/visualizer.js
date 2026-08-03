@@ -12,6 +12,8 @@
 // flat while audio still plays — that case falls back to a synthesised pattern
 // instead of leaving a dead ring on screen.
 
+import { renderStage, setStageOrigin, stageFxState } from './stage-fx.js';
+
 const TAU = Math.PI * 2;
 export const BANDS = 64;
 const SEGMENTS = 7;
@@ -167,7 +169,16 @@ const view = {
 let raf = 0;
 let lastFrame = 0;
 let restMs = 0;
+let lastOriginAt = 0;
 let detectBeat = makeBeatDetector();
+
+// One loop drives both canvases: the record's own ring and the room behind it.
+export function ensureVisualizerLoop() {
+  if (raf) return;
+  lastFrame = 0;
+  restMs = 0;
+  raf = requestAnimationFrame(frame);
+}
 
 export function attachVisualizer(canvas, media, { seed = 0 } = {}) {
   if (seed !== view.seed) {
@@ -178,21 +189,20 @@ export function attachVisualizer(canvas, media, { seed = 0 } = {}) {
   view.canvas = canvas;
   view.media = media;
   view.lastSound = now();
-  if (!raf) {
-    lastFrame = 0;
-    restMs = 0;
-    raf = requestAnimationFrame(frame);
-  }
+  lastOriginAt = 0;
+  ensureVisualizerLoop();
 }
 
+// Only the record goes away between phases; the room behind it keeps running
+// as long as its canvas is on screen.
 export function detachVisualizer() {
-  if (raf) { cancelAnimationFrame(raf); raf = 0; }
   view.canvas = null;
   view.rings.length = 0;
   view.smooth.fill(0);
   view.flash = 0;
   view.energy = 0;
   view.bass = 0;
+  if (raf && !stageFxState().attached) { cancelAnimationFrame(raf); raf = 0; }
 }
 
 // State the smoke test and the browser check assert on.
@@ -213,10 +223,13 @@ const now = () => (typeof performance !== 'undefined' ? performance.now() : Date
 
 function frame(t) {
   raf = requestAnimationFrame(frame);
-  const dt = lastFrame ? Math.min(0.06, (t - lastFrame) / 1000) : 0.016;
-  lastFrame = t;
   const media = view.media;
   const playing = !!media && !media.paused && !media.ended;
+  // Nothing playing: drop to a low frame rate rather than burning a whole core
+  // on a room that is only drifting.
+  if (!playing && lastFrame && t - lastFrame < 45) return;
+  const dt = lastFrame ? Math.min(0.06, (t - lastFrame) / 1000) : 0.016;
+  lastFrame = t;
 
   readLevels(t, playing);
   const s = view.smooth;
@@ -235,7 +248,9 @@ function frame(t) {
 
   // Beats come off the raw bass: the smoothed copy exists to look good, and
   // its slow fall fills in exactly the dips a beat is measured against.
+  let beat = false;
   if (playing && detectBeat(bassLevel(view.raw), t)) {
+    beat = true;
     view.beats += 1;
     view.flash = 1;
     view.rings.push({ age: 0, hue: view.hue });
@@ -253,9 +268,27 @@ function frame(t) {
 
   paint();
 
-  // Nothing playing and everything settled: fold the loop up. Any re-render of
-  // the phase re-attaches and starts it again.
-  if (!playing && view.energy < 0.005 && view.rings.length === 0 && view.flash < 0.02) {
+  if (view.canvas && t - lastOriginAt > 250) {
+    setStageOrigin(view.canvas.getBoundingClientRect());
+    lastOriginAt = t;
+  }
+  const fx = stageFxState().attached;
+  if (fx) {
+    renderStage({
+      levels: view.smooth,
+      bass: view.bass,
+      energy: view.energy,
+      hue: view.hue,
+      beat,
+      playing,
+      dt,
+      now: t,
+    });
+  }
+
+  // Nothing playing, nothing on screen to animate, everything settled: fold the
+  // loop up. Any re-render of the phase re-attaches and starts it again.
+  if (!fx && !playing && view.energy < 0.005 && view.rings.length === 0 && view.flash < 0.02) {
     restMs += dt * 1000;
     if (restMs > 900) { cancelAnimationFrame(raf); raf = 0; }
   } else {

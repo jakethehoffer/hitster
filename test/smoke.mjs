@@ -176,35 +176,43 @@ while (turns < 80 && !won) {
     return g.players[g.current].timeline.some((c) => c.year === g.mystery.year);
   });
   if (repeatedYear) errors.push(`turn ${turns}: mystery repeated a timeline year`);
-  // A paid hint reveals the decade once, spends exactly one token, and never
-  // exposes the exact year in the automation/public state.
+  // A clue costs exactly one token, shows the shape of the title rather than
+  // the title, sells each angle only once, and never states the year anywhere —
+  // not on screen and not in the automation state.
   if (turns === 1) {
     const before = await page.evaluate(() => {
       const g = window.__hitster.game;
-      return { tokens: g.players[g.current].tokens, year: g.mystery.year };
+      return { tokens: g.players[g.current].tokens, year: g.mystery.year, title: g.mystery.title };
     });
-    if (!(await clickText('💡 Hint'))) {
-      errors.push('no hint button in listening phase');
+    if (!(await clickText('🔤 Title'))) {
+      errors.push('no title clue offered in the listening phase');
     } else {
-      const hinted = await page.evaluate(() => {
+      const clued = await page.evaluate(() => {
         const g = window.__hitster.game;
-        const textState = JSON.parse(window.render_game_to_text());
+        const buttons = [...document.querySelectorAll('button')]
+          .filter((b) => b.offsetParent !== null).map((b) => b.textContent);
         return {
           tokens: g.players[g.current].tokens,
-          text: document.querySelector('.song-hint')?.textContent || '',
-          hintButton: [...document.querySelectorAll('button')]
-            .some((b) => b.offsetParent !== null && b.textContent.includes('💡 Hint')),
-          publicMystery: textState.mystery,
+          shown: [...document.querySelectorAll('.clue-masked')].map((n) => n.textContent),
+          titleStillForSale: buttons.some((t) => t.includes('🔤 Title')),
+          artistStillForSale: buttons.some((t) => t.includes('🎤 Artist')),
+          publicMystery: JSON.parse(window.render_game_to_text()).mystery,
         };
       });
-      const decade = `${Math.floor(before.year / 10) * 10}s`;
-      if (hinted.tokens !== before.tokens - 1) errors.push('hint did not spend exactly one token');
-      if (!hinted.text.includes(decade)) errors.push('hint did not show the mystery decade');
-      if (hinted.hintButton) errors.push('hint could be bought twice for one song');
-      if (hinted.publicMystery.hint !== decade || 'year' in hinted.publicMystery) {
-        errors.push('text state leaked the exact mystery year or missed the paid hint');
+      const masked = clued.shown.join(' ');
+      if (clued.tokens !== before.tokens - 1) errors.push('a clue did not spend exactly one token');
+      if (clued.shown.length !== 1) errors.push('the title clue did not appear');
+      if (masked.includes(before.title)) errors.push('the clue printed the title outright');
+      if (/\d/.test(masked)) errors.push('the clue exposed a digit');
+      if (clued.titleStillForSale) errors.push('the same clue could be bought twice');
+      if (!clued.artistStillForSale) errors.push('buying one clue withdrew the others');
+      if (String(clued.publicMystery.year ?? '').length > 0
+        || JSON.stringify(clued.publicMystery).includes(String(before.year))) {
+        errors.push('text state leaked the mystery year');
+      } else if (!clued.publicMystery.clues.includes('title')) {
+        errors.push('text state did not record the bought clue');
       } else {
-        console.log('  ✔ hint spent one token and revealed only the decade');
+        console.log('  ✔ a clue spent one token, masked the title and leaked no year');
       }
       if (process.env.HITSTER_HINT_SCREENSHOT) {
         await page.screenshot({ path: process.env.HITSTER_HINT_SCREENSHOT, fullPage: true });
@@ -239,6 +247,25 @@ while (turns < 80 && !won) {
     }, painted);
     if (stage !== 'ok') errors.push(`turntable/one-page layout: ${stage}`);
     else console.log('  ✔ turntable painted and the whole game screen fits one viewport');
+
+    // The room behind the game paints too, and typing "dance" fills the floor.
+    const roomPainted = await page.waitForFunction(() => {
+      const c = document.querySelector('#stage-fx');
+      if (!c || !c.width || getComputedStyle(c).display === 'none') return false;
+      const px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      for (let i = 3; i < px.length; i += 4) if (px[i] > 3) return true;
+      return false;
+    }, { timeout: 5000 }).then(() => true, () => false);
+    if (!roomPainted) errors.push('the background stage never painted');
+    const before = await page.evaluate(() => window.__hitster.fx().dancing);
+    await page.keyboard.type('dance');
+    const on = await page.evaluate(() => window.__hitster.fx());
+    await page.keyboard.type('dance');
+    const off = await page.evaluate(() => window.__hitster.fx().dancing);
+    if (before !== false) errors.push('dance mode was already on before anyone typed it');
+    else if (on.dancing !== true || on.dancers < 1) errors.push('typing "dance" did not put dancers on the floor');
+    else if (off !== false) errors.push('typing "dance" again did not clear the floor');
+    else if (roomPainted) console.log('  ✔ background stage painted and the dance easter egg toggles');
   }
   // spacebar toggles playback during a turn (must not crash or scroll away)
   if (turns === 1) await page.keyboard.press('Space');

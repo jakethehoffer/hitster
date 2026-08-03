@@ -5,8 +5,13 @@ import {
 import { searchSongs, resolvePreview, resolveReleaseDate, looksLikeAltVersion } from './itunes.js';
 import { artistTopTracks, albumYear, looksLikeCompilation } from './deezer.js';
 import {
-  attachVisualizer, detachVisualizer, primeAudioGraph, seedFrom, visualizerState,
+  attachVisualizer, detachVisualizer, ensureVisualizerLoop, primeAudioGraph,
+  seedFrom, visualizerState,
 } from './visualizer.js';
+import {
+  attachStageFx, detachStageFx, setDanceMode, danceMode, stageFxState,
+} from './stage-fx.js';
+import { HINT_KINDS, hintAvailable, hintLabel, hintReveal } from './hints.js';
 import {
   listDecks, getDeck, saveDeck, deleteDeck, createDeck,
   exportDeck, parseDeckImport, ensureSeedDecks, refreshCachedPreviews,
@@ -72,7 +77,13 @@ function showScreen(name) {
   // The game screen is laid out as one fixed-height page; every other screen
   // is a normal scrolling document.
   document.body.classList.toggle('in-game', name === 'game');
-  if (name !== 'game') detachVisualizer();
+  if (name === 'game') {
+    attachStageFx($('#stage-fx'));
+    ensureVisualizerLoop();
+  } else {
+    detachStageFx();
+    detachVisualizer();
+  }
   if (name === 'home') renderHome();
   if (name === 'decks') renderDeckList();
   if (name === 'setup') renderSetup();
@@ -169,6 +180,31 @@ document.addEventListener('DOMContentLoaded', () => {
   p.addEventListener('error', () => {
     if (playingUrl) onPlaybackFailure(playingUrl);
   });
+});
+
+// Type "dance" anywhere outside a text box and the floor fills up. Typing it
+// again sends them home; the choice is remembered for next time.
+const DANCE_KEY = 'hitster.danceMode';
+const DANCE_WORD = 'dance';
+let danceBuffer = '';
+
+function toggleDance() {
+  const on = !danceMode();
+  setDanceMode(on);
+  try { storage.setItem(DANCE_KEY, on ? '1' : '0'); } catch { /* not worth a warning */ }
+  toast(on
+    ? '🕺 Dance mode on — type "dance" again to clear the floor'
+    : 'The dancers have gone home');
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key.length !== 1) return;
+  if (e.target.closest('input, textarea, select')) return;
+  danceBuffer = (danceBuffer + e.key.toLowerCase()).slice(-DANCE_WORD.length);
+  if (danceBuffer !== DANCE_WORD) return;
+  danceBuffer = '';
+  toggleDance();
 });
 
 // Spacebar = pause/resume the mystery song during a turn. Ignored while
@@ -782,22 +818,27 @@ function renderPhase() {
           onclick: onSkip,
         }));
       }
-      if (!game.hintUsed) {
-        controls.append(el('button', {
-          class: 'btn', text: '💡 Hint (1 token)',
+      const bought = game.hintsUsed || [];
+      const forSale = HINT_KINDS.filter((k) => !bought.includes(k) && hintAvailable(game.mystery, k));
+      const clueRow = forSale.length === 0 ? null : el('div', { class: 'clue-row' },
+        el('span', { class: 'label', text: 'Stuck? Buy a clue (1 token):' }),
+        ...forSale.map((kind) => el('button', {
+          class: 'btn btn-small',
+          text: hintLabel(kind),
+          title: CLUE_TITLES[kind],
           disabled: active.tokens < 1 ? 'true' : null,
-          onclick: onHint,
-        }));
-      }
+          onclick: () => onHint(kind),
+        })));
+      const shown = bought.map((kind) => hintReveal(game.mystery, kind)).filter(Boolean);
+      const clueStrip = shown.length === 0 ? null
+        : el('div', { class: 'clue-strip' }, ...shown.map(clueNode));
       // append() stringifies a null child, so conditional rows are filtered out
       // rather than passed through.
       area.append(...[
         el('h2', { class: 'phase-title' }, el('span', { class: 'who', text: activeName() }), ' — where does it go?'),
         controls,
-        game.hintUsed ? el('p', {
-          class: 'song-hint',
-          text: `💡 Released in the ${Math.floor(game.mystery.year / 10) * 10}s`,
-        }) : null,
+        clueRow,
+        clueStrip,
         // Once a slot is picked the instruction is spent — drop it and give
         // the row back to the turntable.
         selectedSlot == null
@@ -890,6 +931,23 @@ function renderPhase() {
       el('div', { class: 'phase-controls' },
         el('button', { class: 'btn btn-primary btn-big', text: 'Next turn →', onclick: onNextTurn })));
   }
+}
+
+const CLUE_TITLES = {
+  title: 'Reveals the shape of the title — first letters only, never the year',
+  artist: 'Reveals the shape of the artist name — first letters only',
+  cover: 'Shows the album sleeve, blurred',
+};
+
+function clueNode(clue) {
+  if (clue.image) {
+    return el('div', { class: 'clue clue-cover' },
+      el('img', { src: clue.image, alt: 'Blurred album cover' }),
+      el('span', { class: 'clue-note', text: 'cover' }));
+  }
+  return el('div', { class: 'clue' },
+    el('span', { class: 'clue-masked', text: clue.text }),
+    el('span', { class: 'clue-note', text: `${clue.kind}, ${clue.note}` }));
 }
 
 // 👍/👎 for the current song — available while it plays (before you know what
@@ -1352,9 +1410,9 @@ function onLockPlacement() {
   renderGame();
 }
 
-function onHint() {
+function onHint(kind) {
   try {
-    buyHint(game);
+    buyHint(game, kind);
     saveGame();
     renderGame();
   } catch (err) { toast(err.message); }
@@ -1488,6 +1546,7 @@ function clearSavedGamePreviews() {
 document.addEventListener('DOMContentLoaded', () => {
   ensureSeedDecks(storage);
   if (refreshCachedPreviews(storage)) clearSavedGamePreviews();
+  setDanceMode(storage.getItem(DANCE_KEY) === '1');
 
   document.querySelectorAll('[data-nav]').forEach((b) =>
     b.addEventListener('click', () => showScreen(b.dataset.nav)));
@@ -1596,6 +1655,7 @@ window.__hitster = {
   prefetch: (n) => prefetchUpcoming(n),
   refill: () => refillDeck(),
   viz: () => visualizerState(),
+  fx: () => stageFxState(),
 };
 
 // Concise, answer-safe state for browser automation and accessibility checks.
@@ -1616,7 +1676,8 @@ window.render_game_to_text = () => {
       ? { year: revealed.year, title: revealed.title, artist: revealed.artist }
       : {
           preview: previewState,
-          hint: game.hintUsed ? `${Math.floor(game.mystery.year / 10) * 10}s` : null,
+          // which clues were bought, never what they cost the answer
+          clues: game.hintsUsed || [],
         },
     selectedSlot,
     challenges: game.challenges.map((c) => ({ player: game.players[c.player].name, slot: c.slot })),

@@ -204,18 +204,28 @@ test('freeSkip redraws without spending a token', () => {
   assert.equal(s.phase, 'listening');
 });
 
-test('a hint costs one token, is limited to once per song, and resets on redraw', () => {
+test('each clue costs one token, is sold once per song, and resets on redraw', () => {
   const s = freshGame();
   startTurn(s);
-  buyHint(s);
+  buyHint(s, 'title');
   assert.equal(s.players[0].tokens, 1);
-  assert.equal(s.hintUsed, true);
-  assert.throws(() => buyHint(s), /already/i);
-  freeSkip(s);
-  assert.equal(s.hintUsed, false);
-  buyHint(s);
+  assert.deepEqual(s.hintsUsed, ['title']);
+  assert.throws(() => buyHint(s, 'title'), /already/i);
+  // a different angle on the same song is a separate purchase
+  buyHint(s, 'artist');
+  assert.deepEqual(s.hintsUsed, ['title', 'artist']);
   assert.equal(s.players[0].tokens, 0);
-  assert.throws(() => buyHint(s), /No tokens/i);
+  assert.throws(() => buyHint(s, 'cover'), /No tokens/i);
+  freeSkip(s);
+  assert.deepEqual(s.hintsUsed, []);
+});
+
+test('buyHint refuses a clue the game does not sell — including the year', () => {
+  const s = freshGame();
+  startTurn(s);
+  assert.throws(() => buyHint(s, 'year'), /Unknown hint/i);
+  assert.throws(() => buyHint(s, 'decade'), /Unknown hint/i);
+  assert.equal(s.players[0].tokens, 2, 'a refused clue costs nothing');
 });
 
 test('placeCard records the slot and opens the challenge phase', () => {

@@ -2,6 +2,8 @@
 // All mutators validate phase/inputs and throw on illegal actions;
 // the UI only offers legal moves, so a throw signals a bug.
 
+import { HINT_KINDS } from './hints.js';
+
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {
@@ -59,7 +61,7 @@ export function createGame({
     placedSlot: null,
     challenges: [],
     outcome: null,
-    hintUsed: false,
+    hintsUsed: [],
     winners: null,
     settings: { cardsToWin, startTokens, challengesEnabled, endless, hardDraws },
     rngState: rngSeed + 1,
@@ -164,7 +166,7 @@ export function startTurn(state) {
   requirePhase(state, 'idle');
   if (drawableCount(state) === 0) throw new Error('Draw pile empty: no songs from a new year left');
   state.mystery = drawCard(state);
-  state.hintUsed = false;
+  state.hintsUsed = [];
   state.placedSlot = null;
   state.challenges = [];
   state.outcome = null;
@@ -176,7 +178,7 @@ function redraw(state) {
   if (drawableCount(state) === 0) throw new Error('Draw pile empty: no songs from a new year left');
   state.discard.push(state.mystery);
   state.mystery = drawCard(state);
-  state.hintUsed = false;
+  state.hintsUsed = [];
 }
 
 export function skipSong(state) {
@@ -191,13 +193,18 @@ export function freeSkip(state) {
   redraw(state);
 }
 
-export function buyHint(state) {
+// Each kind of clue is sold once per song, so a stuck player can buy more
+// help by paying for a different angle on it.
+export function buyHint(state, kind) {
   requirePhase(state, 'listening');
+  if (!HINT_KINDS.includes(kind)) throw new Error(`Unknown hint: ${kind}`);
+  // Games saved before clues were split by kind carry no list.
+  if (!Array.isArray(state.hintsUsed)) state.hintsUsed = [];
+  if (state.hintsUsed.includes(kind)) throw new Error('That clue is already showing for this song');
   const active = state.players[state.current];
   if (active.tokens < 1) throw new Error('No tokens for a hint');
-  if (state.hintUsed) throw new Error('Hint already used for this song');
   active.tokens -= 1;
-  state.hintUsed = true;
+  state.hintsUsed.push(kind);
 }
 
 export function placeCard(state, slot) {
@@ -313,7 +320,7 @@ export function nextTurn(state) {
   state.placedSlot = null;
   state.challenges = [];
   state.outcome = null;
-  state.hintUsed = false;
+  state.hintsUsed = [];
   state.current = nextPlayer;
   state.phase = 'idle';
 }
