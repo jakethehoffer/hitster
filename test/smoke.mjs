@@ -156,19 +156,28 @@ while (turns < 80 && !won) {
   // place into the first open slot (often wrong on purpose — exercises discard + steal paths)
   await page.evaluate(() => document.querySelector('.slot:not([disabled])').click());
   if (!(await clickText('Lock it in'))) { errors.push(`turn ${turns}: no lock button`); break; }
-  // exercise the challenge/steal UI on turn 2: pick a challenger, then a free slot
+  // exercise the challenge/steal UI on turn 2: pick a challenger, select a slot
+  // (no token spent yet), then confirm — only the confirm spends the token
   if (turns === 2) {
     const challenged = await page.evaluate(() => {
       const picker = document.querySelector('.challenge-picker .btn');
       if (!picker) return 'no picker';
       picker.click();
+      const tokensBefore = window.__hitster.game.players.map((p) => p.tokens).join(',');
       const slot = document.querySelector('.slot:not([disabled]):not(.selected):not(.challenged)');
       if (!slot) return 'no slot';
       slot.click();
-      return document.querySelector('.slot.challenged') ? 'ok' : 'slot not marked';
+      if (document.querySelector('.slot.challenged')) return 'challenged before confirm';
+      if (window.__hitster.game.players.map((p) => p.tokens).join(',') !== tokensBefore) return 'token spent before confirm';
+      const confirmBtn = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Confirm challenge');
+      if (!confirmBtn) return 'no confirm button';
+      confirmBtn.click();
+      if (!document.querySelector('.slot.challenged')) return 'slot not marked';
+      if (window.__hitster.game.players.map((p) => p.tokens).join(',') === tokensBefore) return 'confirm did not spend a token';
+      return 'ok';
     });
     if (challenged !== 'ok') errors.push(`challenge UI: ${challenged}`);
-    else console.log('  ✔ challenge placed via UI');
+    else console.log('  ✔ challenge selected, then confirmed — token spent only on confirm');
   }
   // challenge phase (skipped automatically when nobody has tokens)
   if (await clickText('✨ Reveal!')) { /* revealed */ }
