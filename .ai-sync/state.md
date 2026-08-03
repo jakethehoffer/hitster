@@ -169,3 +169,10 @@ Created: 2026-07-28T21:24:34.3845104-04:00
 - tests run: npm test: 94/94 passed; node --check js/app.js passed; git diff --check passed; live desktop and 390px mobile browser verification passed with zero console errors/warnings; npm run smoke has one stale assertion failure at test/smoke.mjs:168 because it expects a challenge immediately after slot selection.
 - blockers: Automated smoke test is not green until test/smoke.mjs is updated for the new select-then-confirm challenge flow; implementation and manual end-to-end verification passed.
 - next steps: Update test/smoke.mjs challenge flow to select a slot, assert no token spend, click Confirm challenge, then assert .slot.challenged and token deduction; rerun npm run smoke and commit/push that test-only follow-up.
+
+### 2026-08-02T20:27:20.4799194-04:00 - claude - handoff
+- summary: Manager review of the timeline/challenge feature (commit 79f658a): verified all four asks are implemented and closed the one outstanding gap - test/smoke.mjs still asserted the old instant-challenge flow. Smoke now selects a slot, asserts no token spend and no challenge mark, clicks Confirm challenge, then asserts the token deduction and .slot.challenged. Full smoke run green end to end. Commit dd619c4 pushed to origin/master.
+- files changed: test/smoke.mjs
+- tests run: npm test 94/94 passed; npm run smoke SMOKE PASSED end to end incl. new step 'challenge selected, then confirmed - token spent only on confirm', zero console/page errors
+- blockers: none
+- next steps: None outstanding. All four asks shipped and verified: shared base starter card for every player, challenge confirmation with cancel, bigger timeline/cards/slots, full release date in small text on each card.
