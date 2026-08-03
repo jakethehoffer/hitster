@@ -1,10 +1,10 @@
 // The room the record is playing in.
 //
 // A full-screen canvas behind the UI, driven by the same analysis that powers
-// the turntable: drifting aurora, a perspective dance floor, decks spinning on
-// both edges throwing sparks, music notes leaving the record in every
-// direction, and — once somebody types "dance" — a line of dancers working the
-// beat. Everything scales with the music and idles gently when nothing plays.
+// the turntable: drifting aurora, a perspective dance floor, music notes and
+// sparks leaving the record in every direction, and — once somebody types
+// "dance" — a line of dancers working the beat. Everything scales with the
+// music and idles gently when nothing plays.
 
 const TAU = Math.PI * 2;
 const GOLDEN = Math.PI * (3 - Math.sqrt(5)); // even coverage without clumping
@@ -32,7 +32,6 @@ const notes = [];
 const sparks = [];
 const rings = [];
 let blobs = [];
-let decks = [];
 let dancers = [];
 
 export function attachStageFx(node) {
@@ -68,7 +67,6 @@ export function stageFxState() {
     dancing,
     notes: notes.length,
     sparks: sparks.length,
-    decks: decks.length,
     dancers: dancing ? dancers.length : 0,
   };
 }
@@ -92,11 +90,6 @@ function buildScene() {
     vx: rand(-0.02, 0.02), vy: rand(-0.015, 0.015),
     r: rand(0.28, 0.52), hue: i * 55,
   }));
-  // Two decks a side, staggered, hugging the edges where the UI leaves room.
-  decks = [
-    { x: 0.06, y: 0.24, s: 1, spin: 1 }, { x: 0.05, y: 0.72, s: 0.78, spin: -1 },
-    { x: 0.94, y: 0.28, s: 0.86, spin: -1 }, { x: 0.95, y: 0.76, s: 1, spin: 1 },
-  ].map((d, i) => ({ ...d, angle: rand(0, TAU), bob: 0, sway: i * 1.7 }));
   buildDancers();
 }
 
@@ -123,7 +116,6 @@ export function renderStage(p) {
 
   drawBlobs(g, p);
   drawFloor(g, p);
-  drawDecks(g, p);
   drawRings(g, p);
   drawEqualiser(g, p);
   if (dancing) drawDancers(g, p);
@@ -145,12 +137,6 @@ function step(p) {
 
   gridPhase = (gridPhase + dt * (0.08 + bass * 0.5)) % 1;
 
-  for (const d of decks) {
-    d.angle += dt * d.spin * (0.6 + bass * 3.4);
-    d.sway += dt * (0.35 + energy * 0.9);
-    d.bob = Math.sin(d.sway) * height * 0.022;
-  }
-
   // A steady trickle of notes while the music runs, plus a burst on the beat.
   if (playing) {
     spawnCarry += dt * (3 + energy * 22);
@@ -159,7 +145,7 @@ function step(p) {
   if (beat) {
     for (let i = 0; i < 5; i++) spawnNote(hue, Math.max(energy, 0.5));
     rings.push({ age: 0, hue });
-    for (const d of decks) spawnSparks(d, hue);
+    spawnSparks(hue);
     for (const dancer of dancers) { dancer.jump = 1; dancer.lean = rand(-1, 1); }
   }
 
@@ -214,14 +200,14 @@ function spawnNote(hue, energy) {
   });
 }
 
-function spawnSparks(deck, hue) {
-  const r = Math.min(width, height) * 0.1 * deck.s;
-  for (let i = 0; i < 9 && sparks.length < MAX_SPARKS; i++) {
+// Struck off the record's rim on every beat, the way a needle throws light.
+function spawnSparks(hue) {
+  for (let i = 0; i < 16 && sparks.length < MAX_SPARKS; i++) {
     const a = rand(0, TAU);
-    const speed = rand(90, 300);
+    const speed = rand(120, 380);
     sparks.push({
-      x: deck.x * width + Math.cos(a) * r,
-      y: deck.y * height + deck.bob + Math.sin(a) * r,
+      x: origin.x + Math.cos(a) * origin.r,
+      y: origin.y + Math.sin(a) * origin.r,
       vx: Math.cos(a) * speed,
       vy: Math.sin(a) * speed - 70,
       life: rand(0.4, 1),
@@ -268,56 +254,6 @@ function drawFloor(g, p) {
     g.moveTo(vx + i * width * 0.03, horizon);
     g.lineTo(vx + i * width * 0.34, height);
     g.stroke();
-  }
-}
-
-function drawDecks(g, p) {
-  const base = Math.min(width, height) * 0.1;
-  for (const d of decks) {
-    const x = d.x * width;
-    const y = d.y * height + d.bob;
-    const r = base * d.s * (1 + p.bass * 0.07);
-    g.globalCompositeOperation = 'source-over';
-    g.globalAlpha = 0.8;
-    g.save();
-    g.translate(x, y);
-    g.save();
-    g.rotate(d.angle);
-    g.fillStyle = '#0b0b10';
-    g.beginPath();
-    g.arc(0, 0, r, 0, TAU);
-    g.fill();
-    g.strokeStyle = `hsla(${p.hue}, 70%, 66%, ${(0.28 + p.energy * 0.4).toFixed(3)})`;
-    g.lineWidth = 1.2;
-    for (let i = 1; i <= 4; i++) {
-      g.beginPath();
-      g.arc(0, 0, r * (0.32 + i * 0.16), 0, TAU);
-      g.stroke();
-    }
-    g.fillStyle = `hsla(${p.hue}, 95%, 62%, ${(0.6 + p.energy * 0.4).toFixed(3)})`;
-    g.beginPath();
-    g.arc(0, 0, r * 0.26, 0, TAU);
-    g.fill();
-    // the sheen that makes the spin readable
-    g.globalCompositeOperation = 'lighter';
-    g.fillStyle = `hsla(${p.hue + 20}, 100%, 72%, .16)`;
-    g.beginPath();
-    g.moveTo(0, 0);
-    g.arc(0, 0, r, -0.45, 0.45);
-    g.closePath();
-    g.fill();
-    g.restore();
-    // tonearm — fixed while the record turns under it
-    g.globalCompositeOperation = 'source-over';
-    g.strokeStyle = `hsla(${p.hue}, 30%, 82%, .5)`;
-    g.lineWidth = Math.max(1.5, r * 0.05);
-    g.lineCap = 'round';
-    g.beginPath();
-    g.moveTo(r * 0.95 * d.spin, -r * 1.05);
-    g.lineTo(r * 0.3 * d.spin, r * 0.35);
-    g.stroke();
-    g.restore();
-    g.globalAlpha = 1;
   }
 }
 

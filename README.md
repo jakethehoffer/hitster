@@ -34,9 +34,9 @@ Same as real Hitster:
    lights around it dances to whatever is playing: the bars follow the
    spectrum, the disc pulses and throws light on every kick, and the colour
    shifts from hot pink for bass-led songs towards cyan for bright ones.
-   Behind it the whole room moves with the track: decks spinning in the
-   corners throwing sparks, notes streaming off the record in every direction,
-   an equaliser along the floor and light drifting across the back wall.
+   Behind it the whole room moves with the track: notes and sparks streaming
+   off the record in every direction, an equaliser along the floor, a dance
+   floor scrolling with the bass and light drifting across the back wall.
    Pause and resume anytime with the button or the **spacebar** (it picks up
    where it left off). With **Hard draws** on (the default), the game picks
    songs whose years land close to the cards already in your timeline —
