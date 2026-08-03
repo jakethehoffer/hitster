@@ -89,6 +89,12 @@ and challenge steals can still produce same-year cards; those are ordered by
 release date when both dates are known, with either side accepted when a date
 is unavailable.
 
+That rule closes some gaps for good. Because you are never dealt a year already
+on your timeline, a slot between two consecutive years — 2005 and 2006, or 2011
+and 2012 — can never be filled by anything, so it is not offered: those cards
+sit flush against each other and the timeline shows one fewer place to tap.
+Nothing is lost by hiding them, because a card that belongs there cannot exist.
+
 The group is set up once. Player names, cards-to-win, tokens and the toggles
 are remembered, so **Play again** on the win screen drops you straight into
 another game with the same people and deck, **⇄ Change deck** (in the game
@@ -96,7 +102,20 @@ footer, or on the win screen) leaves the current deck for another one without
 losing anyone, and reopening the app after a reload finds everybody still
 there.
 
-Three words do things. Type them anywhere except a text box, and type them
+**⚙ Settings** on the home screen sets how much of the room gets painted, which
+is the knob to reach for if the game feels sluggish on an older phone or laptop:
+
+- **Full** — everything: the drifting background, the ceiling beams, the dance
+  floor, the sparks and notes leaving the record.
+- **Reduced** — keeps the turntable, the beat and the equaliser, and drops the
+  layers that cost the most per frame. On a heavily throttled browser this cut
+  median frame time from 391 ms to 241 ms.
+- **Off** — the background canvas is never attached at all, so no frame loop
+  runs. Same measurement: 6 ms.
+
+The choice is remembered, and it changes nothing about the music or the rules.
+
+Four words do things. Type them anywhere except a text box, and type them
 again to switch them back off:
 
 - **dance** — a line of dancers takes the floor, jumping on every beat under
@@ -106,6 +125,8 @@ again to switch them back off:
 - **crazy** — one dancer appears, and every second the crowd doubles, until
   the screen is full of them screaming. This one always starts fresh: nobody
   wants to reopen the app into two hundred people.
+- **china** — a lantern festival: the room turns red and gold and paper
+  lanterns drift up through it, rising harder on the beat. Remembered.
 
 The game screen is built to sit in one viewport on a phone, a laptop or a TV —
 scoreboard, turntable, timeline and footer all on screen at once, with no

@@ -150,6 +150,21 @@ export function compareCards(a, b) {
   return a.released < b.released ? -1 : 1;
 }
 
+// Nobody is ever dealt a year already on their timeline, so a gap between two
+// consecutive years holds nothing: no song can land strictly between 2005 and
+// 2006. Those slots are offered to no one — the correct slot for a real draw is
+// never one of them, because a card that fits there cannot exist.
+export function slotPossible(timeline, slot) {
+  if (slot <= 0 || slot >= timeline.length) return true;
+  return timeline[slot].year - timeline[slot - 1].year > 1;
+}
+
+export function possibleSlots(timeline) {
+  const all = timeline.map((_, i) => i);
+  all.push(timeline.length);
+  return all.filter((s) => slotPossible(timeline, s));
+}
+
 export function isSlotCorrect(timeline, card, slot) {
   const leftOk = slot === 0 || compareCards(timeline[slot - 1], card) <= 0;
   const rightOk = slot === timeline.length || compareCards(card, timeline[slot]) <= 0;
@@ -213,6 +228,9 @@ export function placeCard(state, slot) {
   if (!Number.isInteger(slot) || slot < 0 || slot > timeline.length) {
     throw new Error(`Slot ${slot} out of range`);
   }
+  if (!slotPossible(timeline, slot)) {
+    throw new Error(`Slot ${slot} sits between consecutive years — nothing can go there`);
+  }
   state.placedSlot = slot;
   state.phase = 'challenge';
 }
@@ -227,6 +245,9 @@ export function addChallenge(state, playerIdx, slot) {
   const timeline = state.players[state.current].timeline;
   if (!Number.isInteger(slot) || slot < 0 || slot > timeline.length) {
     throw new Error(`Slot ${slot} out of range`);
+  }
+  if (!slotPossible(timeline, slot)) {
+    throw new Error(`Slot ${slot} sits between consecutive years — nothing can go there`);
   }
   if (slot === state.placedSlot || state.challenges.some((c) => c.slot === slot)) {
     throw new Error('Slot already claimed');

@@ -305,6 +305,48 @@ body.party .deck-glow {
   .deck-stage { transform: none; }
 }
 
+/* china mode: a lantern festival — red paper, gold leaf */
+body.china {
+  --accent: #e02c2c;
+  --accent-2: #f5b942;
+  --gold: #ffd76a;
+  background: radial-gradient(1200px 600px at 50% -10%, #3a0f14 0%, #170709 60%);
+}
+body.china .vinyl {
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255,235,190,.5) 0 5%, rgba(255,235,190,0) 26%),
+    repeating-conic-gradient(from 0deg,
+      hsla(43, 90%, 62%, .5) 0 6deg, hsla(2, 78%, 40%, .6) 6deg 12deg),
+    radial-gradient(circle at 42% 34%, #8e1616 0 30%, #5c0c0f 70%, #1c0709 100%);
+  border-color: rgba(255, 215, 106, .35);
+  box-shadow:
+    0 10px 40px rgba(0,0,0,.6),
+    0 0 calc(18px + var(--glow, 0) * 60px) hsla(14, 95%, 58%, calc(.32 + var(--glow, 0) * .5));
+}
+body.china .deck-glow {
+  background: radial-gradient(closest-side, hsla(38, 100%, 62%, calc(.32 + var(--glow, 0) * .5)), transparent);
+}
+
+/* ---------- settings ---------- */
+
+.settings-group { max-width: 40rem; }
+.settings-group h3 { margin-bottom: .3rem; }
+.settings-hint { color: var(--ink-dim); margin-bottom: 1rem; }
+.fx-choices { display: flex; flex-direction: column; gap: .6rem; }
+.fx-choice {
+  display: flex; flex-direction: column; gap: .2rem; text-align: left;
+  padding: .8rem 1rem; border-radius: var(--radius);
+  background: var(--bg-raised); color: var(--ink);
+  border: 2px solid transparent; cursor: pointer; font: inherit;
+}
+.fx-choice:hover { background: var(--bg-card); }
+.fx-choice.selected { border-color: var(--accent); background: var(--bg-card); }
+.fx-choice-label { font-weight: 700; }
+.fx-choice-note { color: var(--ink-dim); font-size: .9em; }
+
+/* Reduced/off effects: drop the decoration the canvas is not responsible for. */
+body.fx-lean .deck-glow { display: none; }
+
 /* reveal card */
 .reveal-card {
   display: inline-flex; flex-direction: column; align-items: center; gap: .4rem;

@@ -14,6 +14,18 @@ const EMOJI_FONT = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", s
 const MAX_NOTES = 140;
 const MAX_SPARKS = 260;
 
+// How much of the room to paint. "reduced" drops the layers that cost the most
+// per frame — the full-screen gradients, the floor, the beams, the mirror-ball
+// speckle — and thins the particles, keeping the parts tied to the music.
+// "off" is handled a level up: the canvas is never attached at all.
+const FX_BUDGET = {
+  full: { notes: MAX_NOTES, sparks: MAX_SPARKS, spawn: 1, burst: 16, dpr: 2, rich: true },
+  reduced: { notes: 28, sparks: 40, spawn: 0.3, burst: 4, dpr: 1, rich: false },
+  off: { notes: 0, sparks: 0, spawn: 0, burst: 0, dpr: 1, rich: false },
+};
+let level = 'full';
+const budget = () => FX_BUDGET[level] || FX_BUDGET.full;
+
 let canvas = null;
 let ctx = null;
 let width = 0;
@@ -29,6 +41,7 @@ let originSet = false;
 let dancing = false;
 let party = false;
 let crazy = false;
+let china = false;
 let noteAngle = 0;
 let gridPhase = 0;
 let spawnCarry = 0;
@@ -43,6 +56,7 @@ let dancers = [];
 let lasers = [];
 let ballSpots = [];
 const crowd = [];
+let lanterns = [];
 
 // One at a time, doubling every second, until the screen cannot hold any more.
 const CROWD_START = 1;
@@ -97,16 +111,38 @@ export function setCrazyMode(on) {
 
 export function crazyMode() { return crazy; }
 
+// A lantern festival: the room turns red and gold and paper lanterns drift up
+// through it, rising a little harder on the beat.
+export function setChinaMode(on) {
+  china = !!on;
+  document.body.classList.toggle('china', china);
+  if (china && !lanterns.length) buildLanterns();
+}
+
+export function chinaMode() { return china; }
+
+// 'full' | 'reduced' | 'off' — anything else is treated as full.
+export function setFxLevel(next) {
+  level = FX_BUDGET[next] ? next : 'full';
+  if (notes.length > budget().notes) notes.length = budget().notes;
+  if (sparks.length > budget().sparks) sparks.length = budget().sparks;
+}
+
+export function fxLevel() { return level; }
+
 export function stageFxState() {
   return {
     attached: canvas != null,
     dancing,
     party,
     crazy,
+    china,
+    level,
     notes: notes.length,
     sparks: sparks.length,
     dancers: dancing ? dancers.length : 0,
     crowd: crowd.length,
+    lanterns: china ? lanterns.length : 0,
     lasers: lasers.length,
   };
 }
@@ -116,7 +152,7 @@ function measure() {
   // Zero when reduced motion hides the canvas — renderStage then does nothing.
   width = canvas.clientWidth;
   height = canvas.clientHeight;
-  dpr = Math.min(2, window.devicePixelRatio || 1);
+  dpr = Math.min(budget().dpr, window.devicePixelRatio || 1);
   const w = Math.round(width * dpr);
   const h = Math.round(height * dpr);
   if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
@@ -162,6 +198,18 @@ function buildBallSpots() {
   }));
 }
 
+function buildLanterns() {
+  lanterns = Array.from({ length: 14 }, () => ({
+    x: rand(0.04, 0.96),
+    y: rand(0.05, 1.05),
+    rise: rand(0.018, 0.05),
+    sway: rand(0.3, 0.9),
+    phase: rand(0, TAU),
+    size: rand(0.03, 0.062),
+    lift: 0,
+  }));
+}
+
 function makeCrazy() {
   return {
     x: rand(0.05, 0.95),
@@ -188,12 +236,16 @@ export function renderStage(p) {
 
   step(p);
 
-  drawBlobs(g, p);
-  drawFloor(g, p);
-  drawLasers(g, p);
-  if (party) drawBallSpots(g, p);
+  const rich = budget().rich;
+  if (rich) {
+    drawBlobs(g, p);
+    drawFloor(g, p);
+    drawLasers(g, p);
+    if (party) drawBallSpots(g, p);
+  }
   drawRings(g, p);
   drawEqualiser(g, p);
+  if (china) drawLanterns(g, p);
   if (dancing) drawDancers(g, p);
   drawSparks(g);
   drawNotes(g);
@@ -236,9 +288,18 @@ function step(p) {
 
   gridPhase = (gridPhase + dt * (0.08 + bass * 0.5)) % 1;
 
+  if (china) {
+    for (const l of lanterns) {
+      l.lift = Math.max(0, l.lift - dt * 1.6);
+      l.y -= dt * (l.rise + bass * 0.05 + l.lift * 0.05);
+      l.phase += dt * l.sway;
+      if (l.y < -0.12) { l.y = 1.1; l.x = rand(0.04, 0.96); }
+    }
+  }
+
   // A steady trickle of notes while the music runs, plus a burst on the beat.
   if (playing) {
-    spawnCarry += dt * (3 + energy * 22);
+    spawnCarry += dt * (3 + energy * 22) * budget().spawn;
     while (spawnCarry >= 1) { spawnCarry -= 1; spawnNote(hue, energy); }
   }
   if (beat) {
@@ -246,6 +307,7 @@ function step(p) {
     rings.push({ age: 0, hue });
     spawnSparks(hue);
     for (const dancer of dancers) { dancer.jump = 1; dancer.lean = rand(-1, 1); }
+    for (const l of lanterns) l.lift = 1;
   }
 
   for (let i = notes.length - 1; i >= 0; i--) {
@@ -279,7 +341,7 @@ function step(p) {
 // Every direction, not just the side the last one left from: successive notes
 // step round by the golden angle so the record sings from its whole rim.
 function spawnNote(hue, energy) {
-  if (notes.length >= MAX_NOTES) return;
+  if (notes.length >= budget().notes) return;
   noteAngle = (noteAngle + GOLDEN) % TAU;
   const a = noteAngle + rand(-0.18, 0.18);
   const speed = rand(52, 128) * (0.7 + energy);
@@ -301,7 +363,8 @@ function spawnNote(hue, energy) {
 
 // Struck off the record's rim on every beat, the way a needle throws light.
 function spawnSparks(hue) {
-  for (let i = 0; i < 16 && sparks.length < MAX_SPARKS; i++) {
+  const { burst, sparks: cap } = budget();
+  for (let i = 0; i < burst && sparks.length < cap; i++) {
     const a = rand(0, TAU);
     const speed = rand(120, 380);
     sparks.push({
@@ -444,6 +507,57 @@ function drawDiscoFloor(g, p, horizon, vx) {
       g.fill();
     }
   }
+}
+
+// Paper lanterns drifting up through the room, each with its own glow and a
+// gold tassel swinging under it.
+function drawLanterns(g, p) {
+  const unit = Math.min(width, height);
+  for (const l of lanterns) {
+    const swing = Math.sin(l.phase) * 0.012;
+    const x = (l.x + swing) * width;
+    const y = l.y * height;
+    const r = unit * l.size * (1 + l.lift * 0.12);
+    const glow = 0.22 + p.bass * 0.3 + l.lift * 0.25;
+
+    g.globalCompositeOperation = 'lighter';
+    const halo = g.createRadialGradient(x, y, 0, x, y, r * 3.2);
+    halo.addColorStop(0, `hsla(14, 95%, 60%, ${(glow * 0.5).toFixed(3)})`);
+    halo.addColorStop(1, 'hsla(14, 95%, 60%, 0)');
+    g.fillStyle = halo;
+    g.beginPath();
+    g.arc(x, y, r * 3.2, 0, TAU);
+    g.fill();
+
+    g.globalCompositeOperation = 'source-over';
+    g.save();
+    g.translate(x, y);
+    g.rotate(swing * 6);
+    g.fillStyle = `hsla(2, 78%, ${(46 + p.bass * 12).toFixed(1)}%, 0.92)`;
+    g.beginPath();
+    g.ellipse(0, 0, r * 0.78, r, 0, 0, TAU);
+    g.fill();
+    // gold caps top and bottom, then the tassel
+    g.fillStyle = 'hsla(43, 92%, 62%, 0.95)';
+    g.fillRect(-r * 0.34, -r * 1.02, r * 0.68, r * 0.16);
+    g.fillRect(-r * 0.34, r * 0.86, r * 0.68, r * 0.16);
+    g.strokeStyle = 'hsla(43, 92%, 62%, 0.85)';
+    g.lineWidth = Math.max(1, r * 0.06);
+    g.beginPath();
+    g.moveTo(0, r * 1.02);
+    g.lineTo(Math.sin(l.phase * 2) * r * 0.16, r * 1.5);
+    g.stroke();
+    // ribs, so it reads as paper rather than a balloon
+    g.strokeStyle = 'hsla(8, 70%, 34%, 0.5)';
+    g.lineWidth = Math.max(1, r * 0.035);
+    for (const f of [-0.42, 0, 0.42]) {
+      g.beginPath();
+      g.ellipse(0, 0, r * 0.78 * Math.abs(f || 0.14) * 1.6, r * 0.99, 0, 0, TAU);
+      g.stroke();
+    }
+    g.restore();
+  }
+  g.globalCompositeOperation = 'source-over';
 }
 
 function drawCrowd(g, p) {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createGame, startTurn, skipSong, freeSkip, placeCard, addChallenge,
   resolveTurn, awardBonus, nextTurn, isSlotCorrect, pickHardIndex, insertIntoTimeline, drawableCount, buyHint,
+  slotPossible, possibleSlots,
 } from '../js/engine.js';
 
 const card = (year, title = `song-${year}`) => ({ title, artist: 'artist', year });
@@ -96,6 +97,46 @@ test('isSlotCorrect handles boundaries, middles, and wrong slots', () => {
   assert.equal(isSlotCorrect(tl, card(2005), 0), false);
   assert.equal(isSlotCorrect(tl, card(1985), 1), true);
   assert.equal(isSlotCorrect(tl, card(1985), 2), false);
+});
+
+// --- dead slots between consecutive years ---
+
+test('slotPossible closes the gap between consecutive years and keeps the ends open', () => {
+  const tl = [card(2005), card(2006), card(2010)];
+  assert.equal(slotPossible(tl, 0), true, 'before the first card is always open');
+  assert.equal(slotPossible(tl, 1), false, '2005-2006 has no year between them');
+  assert.equal(slotPossible(tl, 2), true, '2006-2010 has room');
+  assert.equal(slotPossible(tl, 3), true, 'after the last card is always open');
+  assert.deepEqual(possibleSlots(tl), [0, 2, 3]);
+  // two cards of the same year (a steal can do this) are just as closed
+  assert.equal(slotPossible([card(1999), card(1999)], 1), false);
+  // a single-card timeline has both ends and nothing to close
+  assert.deepEqual(possibleSlots([card(1990)]), [0, 1]);
+});
+
+// The rule only holds if a real draw can never need one of those slots — a card
+// that fits between consecutive years cannot exist, so this must never fire.
+test('no drawable card is ever correct in a slot the game hides', () => {
+  const tl = [card(1980), card(1981), card(1990), card(1991)];
+  const onTimeline = new Set(tl.map((c) => c.year));
+  for (let year = 1975; year <= 1996; year++) {
+    if (onTimeline.has(year)) continue; // never dealt: the year is already down
+    for (let slot = 0; slot <= tl.length; slot++) {
+      if (slotPossible(tl, slot)) continue;
+      assert.equal(isSlotCorrect(tl, card(year), slot), false,
+        `${year} was correct in hidden slot ${slot}`);
+    }
+  }
+});
+
+test('placeCard and addChallenge refuse a slot between consecutive years', () => {
+  const s = freshGame();
+  s.players[0].timeline = [card(2005), card(2006)];
+  startTurn(s);
+  s.mystery = card(2001);
+  assert.throws(() => placeCard(s, 1), /consecutive years/);
+  placeCard(s, 0);
+  assert.throws(() => addChallenge(s, 1, 1), /consecutive years/);
 });
 
 test('isSlotCorrect counts same-year ties as correct on either side', () => {

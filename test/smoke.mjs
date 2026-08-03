@@ -572,6 +572,122 @@ await step('endless refill discovers new songs when the pile runs low', async ()
   return grew;
 });
 
+// A slot between two consecutive years can never be filled, because nobody is
+// dealt a year already on their timeline. It must not be offered at all.
+console.log('smoke: dead slots between consecutive years');
+await step('consecutive years render no slot between them', async () => {
+  const seen = await page.evaluate(() => {
+    const g = window.__hitster.game;
+    if (!g) return { error: 'no game' };
+    g.phase = 'listening';
+    g.placedSlot = null;
+    g.challenges = [];
+    g.players[g.current].timeline = [
+      { title: 'a', artist: 'x', year: 1990 },
+      { title: 'b', artist: 'x', year: 2005 },
+      { title: 'c', artist: 'x', year: 2006 },
+      { title: 'd', artist: 'x', year: 2011 },
+      { title: 'e', artist: 'x', year: 2012 },
+    ];
+    window.__hitster.render();
+    // Walk the row in order: cards and slots as actually laid out.
+    const row = document.querySelector('.timeline');
+    const shape = [...row.children].map((n) => (n.classList.contains('slot')
+      ? 'slot'
+      : n.querySelector('.tc-year')?.textContent));
+    return { shape, slots: row.querySelectorAll('.slot').length };
+  });
+  if (seen.error) { errors.push(seen.error); return false; }
+  // 5 cards, 6 slot positions, two of them (2005|2006 and 2011|2012) closed
+  const want = ['slot', '1990', 'slot', '2005', '2006', 'slot', '2011', '2012', 'slot'];
+  const ok = seen.slots === 4 && JSON.stringify(seen.shape) === JSON.stringify(want);
+  if (!ok) errors.push(`dead slots: ${JSON.stringify(seen)}`);
+  return ok;
+});
+
+// Reduced/off effects have to actually cut work, not just relabel a button.
+console.log('smoke: visual effects setting');
+await step('settings screen offers three effect levels', async () => {
+  await page.evaluate(() => {
+    const g = window.__hitster.game;
+    if (g) g.phase = 'gameover';
+  });
+  await page.evaluate(() => { document.querySelector('[data-nav="home"]')?.click(); });
+  await page.evaluate(() => { document.querySelector('#btn-settings').click(); });
+  return page.evaluate(() => document.querySelectorAll('.fx-choice').length === 3);
+});
+await step('reduced thins the room and is remembered', async () => {
+  const state = await page.evaluate(async () => {
+    [...document.querySelectorAll('.fx-choice')]
+      .find((b) => b.textContent.includes('Reduced')).click();
+    await new Promise((r) => setTimeout(r, 300));
+    return {
+      stored: localStorage.getItem('hitster.fxLevel'),
+      level: window.__hitster.fx().level,
+      lean: document.body.classList.contains('fx-lean'),
+      selected: document.querySelector('.fx-choice.selected')?.textContent.includes('Reduced'),
+    };
+  });
+  const ok = state.stored === 'reduced' && state.level === 'reduced' && state.lean && state.selected;
+  if (!ok) errors.push(`reduced fx: ${JSON.stringify(state)}`);
+  return ok;
+});
+await step('off detaches the canvas entirely', async () => {
+  const state = await page.evaluate(async () => {
+    [...document.querySelectorAll('.fx-choice')]
+      .find((b) => b.textContent.includes('Off')).click();
+    await new Promise((r) => setTimeout(r, 300));
+    return {
+      stored: localStorage.getItem('hitster.fxLevel'),
+      attached: window.__hitster.fx().attached,
+      canvasShown: getComputedStyle(document.querySelector('#stage-fx')).display,
+    };
+  });
+  const ok = state.stored === 'off' && state.attached === false && state.canvasShown === 'none';
+  if (!ok) errors.push(`off fx: ${JSON.stringify(state)}`);
+  return ok;
+});
+await step('the level survives a reload', async () => {
+  await page.reload({ waitUntil: 'networkidle0' });
+  return page.evaluate(() => window.__hitster.fx().level === 'off'
+    && document.body.classList.contains('fx-lean'));
+});
+
+// The china easter egg: lanterns, and a room that turns red and gold.
+console.log('smoke: china mode');
+await step('typing "china" lights the lanterns', async () => {
+  await page.evaluate(async () => {
+    // effects back on, or the canvas never attaches and nothing can be counted
+    document.querySelector('#btn-settings').click();
+    [...document.querySelectorAll('.fx-choice')].find((b) => b.textContent.includes('Full')).click();
+    await new Promise((r) => setTimeout(r, 200));
+  });
+  for (const ch of 'china') await page.keyboard.press(ch);
+  await new Promise((r) => setTimeout(r, 500));
+  const state = await page.evaluate(() => ({
+    china: window.__hitster.fx().china,
+    lanterns: window.__hitster.fx().lanterns,
+    body: document.body.classList.contains('china'),
+    attached: window.__hitster.fx().attached,
+  }));
+  const ok = state.china && state.body && state.lanterns > 0 && state.attached;
+  if (!ok) errors.push(`china on: ${JSON.stringify(state)}`);
+  return ok;
+});
+await step('typing "china" again packs them away, and it is remembered', async () => {
+  const remembered = await page.evaluate(() => localStorage.getItem('hitster.eggs') || '');
+  for (const ch of 'china') await page.keyboard.press(ch);
+  await new Promise((r) => setTimeout(r, 300));
+  const state = await page.evaluate(() => ({
+    china: window.__hitster.fx().china,
+    body: document.body.classList.contains('china'),
+    stored: localStorage.getItem('hitster.eggs') || '',
+  }));
+  const ok = remembered.includes('china') && !state.china && !state.body && !state.stored.includes('china');
+  if (!ok) errors.push(`china off: ${JSON.stringify({ remembered, ...state })}`);
+  return ok;
+});
+
 await browser.close();
 server.close();
 

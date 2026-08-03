@@ -1,6 +1,6 @@
 import {
   createGame, startTurn, skipSong, freeSkip, placeCard, addChallenge,
-  resolveTurn, awardBonus, nextTurn, drawableCount, buyHint,
+  resolveTurn, awardBonus, nextTurn, drawableCount, buyHint, slotPossible,
 } from './engine.js';
 import { searchSongs, resolvePreview, resolveReleaseDate, looksLikeAltVersion } from './itunes.js';
 import { artistTopTracks, albumYear, looksLikeCompilation } from './deezer.js';
@@ -11,6 +11,7 @@ import {
 import {
   attachStageFx, detachStageFx, stageFxState,
   setDanceMode, danceMode, setPartyMode, partyMode, setCrazyMode, crazyMode,
+  setChinaMode, chinaMode, setFxLevel, fxLevel,
 } from './stage-fx.js';
 import { HINT_KINDS, hintAvailable, hintLabel, hintReveal } from './hints.js';
 import {
@@ -77,7 +78,10 @@ let currentScreen = 'home';
 // The room paints during a game, and anywhere else an easter egg is running —
 // typing "party" on the home screen should do something.
 function syncStageFx() {
-  const wanted = currentScreen === 'game' || danceMode() || partyMode() || crazyMode();
+  // "Effects off" is answered here rather than inside the canvas: nothing is
+  // attached, so no frame loop runs at all.
+  const wanted = fxLevel() !== 'off'
+    && (currentScreen === 'game' || danceMode() || partyMode() || crazyMode() || chinaMode());
   document.body.classList.toggle('fx-on', wanted);
   if (wanted) {
     attachStageFx($('#stage-fx'));
@@ -86,6 +90,22 @@ function syncStageFx() {
     detachStageFx();
     detachVisualizer();
   }
+}
+
+// ---------- visual effects level ----------
+
+const FX_KEY = 'hitster.fxLevel';
+
+function restoreFxLevel() {
+  setFxLevel(storage.getItem(FX_KEY) || 'full');
+}
+
+function applyFxLevel(next) {
+  setFxLevel(next);
+  try { storage.setItem(FX_KEY, fxLevel()); } catch { /* not worth a warning */ }
+  document.body.classList.toggle('fx-lean', fxLevel() !== 'full');
+  syncStageFx();
+  renderSettings();
 }
 
 function showScreen(name) {
@@ -99,6 +119,7 @@ function showScreen(name) {
   if (name === 'home') renderHome();
   if (name === 'decks') renderDeckList();
   if (name === 'setup') renderSetup();
+  if (name === 'settings') renderSettings();
   stopAudio();
 }
 
@@ -223,6 +244,14 @@ const EGGS = [
     on: '😱 One dancer. Doubling every second. Type "crazy" to make it stop',
     off: 'Crowd cleared',
   },
+  {
+    word: 'china',
+    remember: true,
+    is: chinaMode,
+    set: setChinaMode,
+    on: '🏮 Lantern festival — type "china" again to take them down',
+    off: 'Lanterns packed away',
+  },
 ];
 const EGG_BUFFER = Math.max(...EGGS.map((e) => e.word.length));
 let eggBuffer = '';
@@ -278,6 +307,29 @@ document.addEventListener('keydown', (e) => {
 function renderHome() {
   const hasSave = storage.getItem(SAVE_KEY) != null;
   $('#btn-resume').classList.toggle('hidden', !hasSave);
+}
+
+// ---------- settings ----------
+
+const FX_CHOICES = [
+  { value: 'full', label: 'Full', note: 'Everything: the room, the beams, the dance floor.' },
+  { value: 'reduced', label: 'Reduced', note: 'Keeps the record and the beat, drops the heavy background.' },
+  { value: 'off', label: 'Off', note: 'No background effects at all — the fastest option.' },
+];
+
+function renderSettings() {
+  const box = $('#fx-choices');
+  if (!box) return;
+  clear(box);
+  for (const choice of FX_CHOICES) {
+    const active = fxLevel() === choice.value;
+    box.append(el('button', {
+      class: `fx-choice${active ? ' selected' : ''}`,
+      onclick: () => applyFxLevel(choice.value),
+    },
+    el('span', { class: 'fx-choice-label', text: choice.label }),
+    el('span', { class: 'fx-choice-note', text: choice.note })));
+  }
 }
 
 // ---------- deck list ----------
@@ -1140,7 +1192,9 @@ function renderTimeline() {
     row.append(slotNode(0));
     tl.forEach((c, i) => {
       row.append(timelineCardNode(c, false));
-      row.append(slotNode(i + 1));
+      // Consecutive years leave no room between them, so that slot is not drawn
+      // at all rather than offered as a move that can never be right.
+      if (slotPossible(tl, i + 1)) row.append(slotNode(i + 1));
     });
   }
   areaWrap.append(row);
@@ -1600,6 +1654,8 @@ function clearSavedGamePreviews() {
 document.addEventListener('DOMContentLoaded', () => {
   ensureSeedDecks(storage);
   if (refreshCachedPreviews(storage)) clearSavedGamePreviews();
+  restoreFxLevel();
+  document.body.classList.toggle('fx-lean', fxLevel() !== 'full');
   restoreEggs();
 
   document.querySelectorAll('[data-nav]').forEach((b) =>
@@ -1607,6 +1663,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('#btn-new-game').addEventListener('click', () => showScreen('setup'));
   $('#btn-decks').addEventListener('click', () => showScreen('decks'));
+  $('#btn-settings').addEventListener('click', () => showScreen('settings'));
   $('#btn-resume').addEventListener('click', resumeGame);
 
   $('#btn-create-deck').addEventListener('click', () => {
@@ -1710,6 +1767,7 @@ window.__hitster = {
   refill: () => refillDeck(),
   viz: () => visualizerState(),
   fx: () => stageFxState(),
+  render: () => renderGame(),
 };
 
 // Concise, answer-safe state for browser automation and accessibility checks.

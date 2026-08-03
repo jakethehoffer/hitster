@@ -22,8 +22,22 @@
         <button id="btn-new-game" class="btn btn-primary btn-big">▶ New game</button>
         <button id="btn-resume" class="btn btn-big hidden">↻ Resume game</button>
         <button id="btn-decks" class="btn btn-big">♫ Decks</button>
+        <button id="btn-settings" class="btn btn-big">⚙ Settings</button>
       </div>
       <p id="storage-notice" class="notice hidden">Heads up: browser storage is unavailable — decks and saves won't survive a refresh.</p>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section data-screen="settings" class="screen hidden">
+    <div class="screen-head">
+      <button class="btn btn-back" data-nav="home">← Back</button>
+      <h2>Settings</h2>
+    </div>
+    <div class="settings-group">
+      <h3>Visual effects</h3>
+      <p class="settings-hint">On an older phone or laptop, turning these down makes the game run smoother. The music and the rules are the same either way.</p>
+      <div id="fx-choices" class="fx-choices"></div>
     </div>
   </section>
 
